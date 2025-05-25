@@ -9,8 +9,8 @@ type BetterOmit<T, K extends keyof never> = T extends Record<never, never>
   : T;
 
 /**
- * Make all the properties of a type mutable.
+ * Sets a type as nullish
  */
-type Mutable<T> = {
-  -readonly [K in keyof T]: T[K];
-};
+type Nullish<T> = T | null | undefined;
+
+type MaybePromise<T> = (() => Promise<T>) | (() => T);

@@ -1,6 +1,6 @@
 <template>
   <canvas
-    v-if="!error"
+    v-if="isDocumentVisible && !error"
     ref="canvas"
     v-bind="$attrs"
     :key="`canvas-${hash}`"
@@ -9,67 +9,48 @@
   <slot v-else />
 </template>
 
-<script lang="ts">
-import { wrap } from 'comlink';
-import { ref, shallowRef, watch } from 'vue';
-import BlurhashWorker from './BlurhashWorker?worker&inline';
-import { remote } from '@/plugins/remote';
-
-const worker = new BlurhashWorker();
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-const pixelWorker = wrap<typeof import('./BlurhashWorker')['default']>(worker);
+<script setup lang="ts">
+import { transfer } from 'comlink';
+import { shallowRef, watch, useTemplateRef } from 'vue';
+import { blurhashDrawer } from '#/plugins/workers';
+import { BLURHASH_DEFAULT_HEIGHT, BLURHASH_DEFAULT_WIDTH, BLURHASH_DEFAULT_PUNCH, isDocumentVisible } from '#/store';
 
 /**
- * Clear cached blurhashes on logout
+ * Browsers stop canvases when the page is out of view (for example, minimised or in a background tab).
+ * We unmount the canvas with `isDocumentVisible` to free resources and ensure the correct appearance when the
+ * page is restored.
  */
-watch(
-  () => remote.auth.currentUser,
-  async (newVal) => {
-    if (newVal === undefined) {
-      await pixelWorker.clearCache();
-    }
-  }, { flush: 'post' }
-);
-</script>
 
-<script setup lang="ts">
-const props = withDefaults(
-  defineProps<{
-    hash: string;
-    width?: number;
-    height?: number;
-    punch?: number;
-  }>(),
-  { width: 32, height: 32, punch: 1 }
-);
+const { hash,
+  width = BLURHASH_DEFAULT_WIDTH,
+  height = BLURHASH_DEFAULT_HEIGHT,
+  punch = BLURHASH_DEFAULT_PUNCH
+} = defineProps<{
+  hash: string;
+  width?: number;
+  height?: number;
+  punch?: number;
+}>();
 
-const pixels = ref<Uint8ClampedArray>();
 const error = shallowRef(false);
-const canvas = shallowRef<HTMLCanvasElement>();
+const canvasRef = useTemplateRef('canvas');
 
-watch([props, canvas], async () => {
-  if (canvas.value) {
-    const context = canvas.value.getContext('2d');
-    const imageData = context?.createImageData(props.width, props.height);
+watch(canvasRef, async () => {
+  if (canvasRef.value) {
+    error.value = false;
 
     try {
-      error.value = false;
-      pixels.value = await pixelWorker.getPixels(
-        props.hash,
-        props.width,
-        props.height,
-        props.punch
-      );
+      const offscreen = canvasRef.value.transferControlToOffscreen();
+
+      await blurhashDrawer.draw(transfer(
+        { canvas: offscreen,
+          hash: hash,
+          width: width,
+          height: height,
+          punch: punch
+        }, [offscreen]));
     } catch {
-      pixels.value = undefined;
       error.value = true;
-
-      return;
-    }
-
-    if (imageData && context) {
-      imageData.data.set(pixels.value);
-      context.putImageData(imageData, 0, 0);
     }
   }
 });

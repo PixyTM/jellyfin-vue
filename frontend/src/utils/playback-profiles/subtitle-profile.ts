@@ -1,5 +1,5 @@
 /**
- * @deprecated - Check @/utils/playback-profiles/index
+ * @deprecated - Check #/utils/playback-profiles/index
  */
 
 import {
@@ -12,8 +12,8 @@ import {
  *
  * @returns An array of subtitle profiles for the current platform.
  */
-export function getSubtitleProfiles(): Array<SubtitleProfile> {
-  const SubtitleProfiles: Array<SubtitleProfile> = [];
+export function getSubtitleProfiles(): SubtitleProfile[] {
+  const SubtitleProfiles: SubtitleProfile[] = [];
 
   SubtitleProfiles.push(
     {
@@ -26,6 +26,10 @@ export function getSubtitleProfiles(): Array<SubtitleProfile> {
     },
     {
       Format: 'ssa',
+      Method: SubtitleDeliveryMethod.External
+    },
+    {
+      Format: 'pgssub',
       Method: SubtitleDeliveryMethod.External
     }
   );

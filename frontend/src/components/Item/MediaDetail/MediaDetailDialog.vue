@@ -29,7 +29,7 @@
 
     <VCardText
       v-if="selectedMediaSource"
-      class="pa-3 d-flex flex-column flex-grow-1">
+      class="d-flex flex-grow-1 flex-column pa-3">
       <template v-if="(selectedMediaSource.MediaStreams?.length ?? 0) > 0">
         <VTabs
           v-model="currentTab"
@@ -121,13 +121,13 @@
       </template>
       <h2
         v-else
-        class="no-media text-center">
+        class="text-center no-media">
         {{ t('NoMediaStreamsAvailable') }}
       </h2>
     </VCardText>
     <VCardText
       v-else
-      class="pa-0 pb-8 flex-grow-1"
+      class="pa-0 flex-grow-1 pb-8"
       :class="{
         'd-flex': !$vuetify.display.mobile,
         'flex-row': !$vuetify.display.mobile
@@ -146,62 +146,62 @@ import type {
   MediaStream
 } from '@jellyfin/sdk/lib/generated-client';
 import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { getLocaleName } from '@/utils/i18n';
-import { formatBitRate, formatFileSize } from '@/utils/items';
-import { isArray, isNil, isNumber } from '@/utils/validation';
+import { useTranslation } from 'i18next-vue';
+import { isArray, isNil, isNumber } from '@jellyfin-vue/shared/validation';
+import { getLocaleName } from '#/utils/i18n';
+import { formatBitRate, formatFileSize } from '#/utils/items';
 
-const props = defineProps<{ item: BaseItemDto; mediaSourceIndex?: number }>();
+const { item, mediaSourceIndex } = defineProps<{ item: BaseItemDto; mediaSourceIndex?: number }>();
 
 const emit = defineEmits<{
   close: [];
 }>();
 
-const { t, locale } = useI18n();
+const { t, i18next } = useTranslation();
 
-const model = ref(true);
+const model = defineModel<boolean>({ default: true });
 const currentTab = ref<string>();
 
 /**
  * Closes the dialog and kills the DOM element.
  */
-function close (): void {
+function close(): void {
   model.value = false;
   emit('close');
 }
 
 const mediaSources = computed<MediaSourceInfo[]>(() => {
-  return props.item.MediaSources ?? [];
+  return item.MediaSources ?? [];
 });
 
-const selectedMediaSourceIndex = ref<number>(props.mediaSourceIndex ?? 0);
+const selectedMediaSourceIndex = ref<number>(mediaSourceIndex ?? 0);
 const selectedMediaSource = computed<MediaSourceInfo | undefined>(
   () => mediaSources.value[selectedMediaSourceIndex.value] ?? undefined
 );
 const selectedMediaStreamsVideo = computed<MediaStream[]>(() =>
   (selectedMediaSource.value?.MediaStreams ?? []).filter(
-    (s) => s.Type === 'Video'
+    s => s.Type === 'Video'
   )
 );
 const selectedMediaStreamsAudio = computed<MediaStream[]>(() =>
   (selectedMediaSource.value?.MediaStreams ?? []).filter(
-    (s) => s.Type === 'Audio'
+    s => s.Type === 'Audio'
   )
 );
 const selectedMediaStreamsSubs = computed<MediaStream[]>(() =>
   (selectedMediaSource.value?.MediaStreams ?? []).filter(
-    (s) => s.Type === 'Subtitle'
+    s => s.Type === 'Subtitle'
   )
 );
 const selectedMediaStreamsImage = computed<MediaStream[]>(() =>
   (selectedMediaSource.value?.MediaStreams ?? []).filter(
-    (s) => s.Type === 'EmbeddedImage'
+    s => s.Type === 'EmbeddedImage'
   )
 );
 
 const displayName = computed(() => {
-  if ((props.item.MediaSources?.length ?? 0) > 1) {
-    const parent = props.item.Name;
+  if ((item.MediaSources?.length ?? 0) > 1) {
+    const parent = item.Name;
 
     if (parent) {
       return `${parent} - ${selectedMediaSource.value?.Name ?? ''}`;
@@ -213,17 +213,17 @@ const displayName = computed(() => {
 const generalProperties = computed(() => {
   if (selectedMediaSource.value) {
     const p = new Map<string, string | number | boolean | null | undefined>();
-    const formats =
-      isArray(selectedMediaSource.value.Formats) &&
-      selectedMediaSource.value.Formats.length > 0
+    const formats
+      = isArray(selectedMediaSource.value.Formats)
+        && selectedMediaSource.value.Formats.length
         ? selectedMediaSource.value.Formats.join(',')
         : undefined;
     const fileSize = isNumber(selectedMediaSource.value.Size)
       ? formatFileSize(selectedMediaSource.value.Size)
       : undefined;
-    const bitrate =
-      isNumber(selectedMediaSource.value.Bitrate) &&
-      selectedMediaSource.value.Bitrate > 0
+    const bitrate
+      = isNumber(selectedMediaSource.value.Bitrate)
+        && selectedMediaSource.value.Bitrate > 0
         ? formatBitRate(selectedMediaSource.value.Bitrate)
         : undefined;
 
@@ -242,7 +242,7 @@ const generalProperties = computed(() => {
  * of a media stream
  */
 function getDisplayLocaleName(language: string | null | undefined): string {
-  const result = language ? getLocaleName(language, locale.value) : undefined;
+  const result = language ? getLocaleName(language, i18next.language) : undefined;
 
   return result ?? t('unknown');
 }

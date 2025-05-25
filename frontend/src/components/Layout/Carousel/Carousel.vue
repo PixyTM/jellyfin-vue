@@ -1,5 +1,5 @@
 <template>
-  <div class="swiperContainer user-select-none">
+  <div class="swiper-parent uno-select-none">
     <CarouselProgressBar
       v-if="progressBar && topProgressBar && slides > 0"
       :pages="slides"
@@ -12,16 +12,16 @@
       @progress-clicked="onProgressClicked" />
     <Swiper
       :modules="modules"
-      :class="useResponsiveClasses('swiper')"
-      loop
-      parallax
-      autoplay
+      :class="useResponsiveClasses('swiper-el')"
       effect="fade"
       :fade-effect="{ crossFade: true }"
-      keyboard
+      autoplay
       a11y
+      loop
+      parallax
+      keyboard
       @swiper="(swiper) => swiperInstance = swiper"
-      @slide-change="onSlideChange"
+      @real-index-change="onSlideChange"
       @touch-start="onTouch"
       @touch-end="onTouch">
       <slot name="slides" />
@@ -50,26 +50,17 @@ import 'swiper/css/virtual';
 import { A11y, EffectFade, Keyboard, Parallax, Virtual } from 'swiper/modules';
 import { Swiper } from 'swiper/vue';
 import { ref, shallowRef } from 'vue';
-import { useResponsiveClasses } from '@/composables/use-responsive-classes';
+import { useResponsiveClasses } from '#/composables/use-responsive-classes';
 
-withDefaults(
-  defineProps<{
-    slides: number;
-    /**
-     * In milliseconds
-     */
-    slideDuration?: number;
-    progressBar?: boolean;
-    topProgressBar?: boolean;
-    pageBackdrop?: boolean;
-  }>(),
-  {
-    slideDuration: 7000,
-    progressBar: false,
-    topProgressBar: false,
-    pageBackdrop: false
-  }
-);
+const { slideDuration = 7000, progressBar, topProgressBar } = defineProps<{
+  slides: number;
+  /**
+   * In milliseconds
+   */
+  slideDuration?: number;
+  progressBar?: boolean;
+  topProgressBar?: boolean;
+}>();
 
 const emit = defineEmits<{
   'on-slide-change': [currentIndex: number, swiper: SwiperType];
@@ -119,6 +110,31 @@ function onProgressClicked(index: number): void {
 }
 </script>
 
-<style lang="scss" scoped>
-@import '@/assets/styles/Carousel/index.scss';
+<style scoped>
+.swiper-parent {
+  min-width: 100%;
+  min-height: 100%;
+  position: relative;
+}
+
+.swiper-el.md-and-up {
+  margin-bottom: -128px !important;
+}
+
+.swiper-el.sm-and-up {
+  margin-top: -64px;
+}
+
+.progress-bar {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  margin-top: 0;
+}
+
+.progress-bar.sm-and-up {
+  position: relative !important;
+  top: initial;
+  margin-top: initial;
+}
 </style>

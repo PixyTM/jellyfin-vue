@@ -7,11 +7,11 @@
  * - WebSocket ($remote.socket)
  */
 import type { App } from 'vue';
+import { isNil, sealed } from '@jellyfin-vue/shared/validation';
 import RemotePluginAuthInstance from './auth';
 import RemotePluginSDKInstance from './sdk';
 import RemotePluginSocketInstance from './socket';
-import { isNil, sealed } from '@/utils/validation';
-import { getJSONConfig } from '@/utils/external-config';
+import { jsonConfig } from '#/utils/external-config';
 
 @sealed
 class RemotePlugin {
@@ -34,20 +34,19 @@ export function createPlugin(): {
       /**
        * `remote` is readonly but this is the one place it should actually be set
        */
-      (app.config.globalProperties.$remote as typeof remote) =
-        remote;
+      (app.config.globalProperties.$remote as typeof remote)
+        = remote;
 
       const auth = remote.auth;
-      const config = await getJSONConfig();
-      const defaultServers = config.defaultServerURLs;
+      const defaultServers = jsonConfig.defaultServerURLs;
       /**
        * We reverse the list so the first server is the last to be connected,
        * and thus is the chosen one by default
        */
       const missingServers = defaultServers
         .filter((serverUrl) => {
-          const server = auth.servers.find(
-            (lsServer) => lsServer.PublicAddress === serverUrl
+          const server = auth.servers.value.find(
+            lsServer => lsServer.PublicAddress === serverUrl
           );
 
           return isNil(server);

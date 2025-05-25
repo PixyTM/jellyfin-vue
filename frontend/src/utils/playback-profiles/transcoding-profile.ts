@@ -1,5 +1,5 @@
 /**
- * @deprecated - Check @/utils/playback-profiles/index
+ * @deprecated - Check #/utils/playback-profiles/index
  */
 
 import {
@@ -27,7 +27,7 @@ import {
   isChromiumBased,
   isAndroid,
   isTizen
-} from '@/utils/browser-detection';
+} from '#/utils/browser-detection';
 
 /**
  * Returns a valid TranscodingProfile for the current platform.
@@ -37,14 +37,14 @@ import {
  */
 export function getTranscodingProfiles(
   videoTestElement: HTMLVideoElement
-): Array<TranscodingProfile> {
+): TranscodingProfile[] {
   const TranscodingProfiles: TranscodingProfile[] = [];
   const physicalAudioChannels = isTv() ? 6 : 2;
 
   const hlsBreakOnNonKeyFrames = !!(
-    isApple() ||
-    (isEdge() && !isChromiumBased()) ||
-    !canPlayNativeHls(videoTestElement)
+    isApple()
+    || (isEdge() && !isChromiumBased())
+    || !canPlayNativeHls(videoTestElement)
   );
 
   const mp4AudioCodecs = getSupportedMP4AudioCodecs(videoTestElement);
@@ -55,9 +55,9 @@ export function getTranscodingProfiles(
     TranscodingProfiles.push({
       // Hlsjs, edge, and android all seem to require ts container
       Container:
-        !canPlayNativeHls(videoTestElement) ||
-        (isEdge() && !isChromiumBased()) ||
-        isAndroid()
+        !canPlayNativeHls(videoTestElement)
+        || (isEdge() && !isChromiumBased())
+        || isAndroid()
           ? 'ts'
           : 'aac',
       Type: DlnaProfileType.Audio,
@@ -70,7 +70,7 @@ export function getTranscodingProfiles(
     });
   }
 
-  for (const audioFormat of ['aac', 'mp3', 'opus', 'wav'].filter((format) =>
+  for (const audioFormat of ['aac', 'mp3', 'opus', 'wav'].filter(format =>
     getSupportedAudioCodecs(format)
   )) {
     TranscodingProfiles.push({
@@ -87,9 +87,9 @@ export function getTranscodingProfiles(
   const hlsInTsAudioCodecs = getSupportedTsAudioCodecs(videoTestElement);
 
   if (
-    canPlayHls &&
-    hlsInTsVideoCodecs.length > 0 &&
-    hlsInTsAudioCodecs.length > 0
+    canPlayHls
+    && hlsInTsVideoCodecs.length
+    && hlsInTsAudioCodecs.length
   ) {
     TranscodingProfiles.push({
       Container: 'ts',

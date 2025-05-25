@@ -1,28 +1,17 @@
 <template>
-  <VBtn
-    class="align-self-center ma-1"
-    v-bind="mergeProps($props)"
-    icon
-    size="small"
-    variant="elevated">
-    <slot name="icon" />
-
-    <VTooltip
+  <JTooltip position="bottom">
+    <VBtn
+      class="align-self-center ma-1"
+      icon
+      size="small"
+      variant="elevated"
+      v-bind="$attrs">
+      <slot name="icon" />
+    </VBtn>
+    <template
       v-if="$slots.tooltip"
-      location="bottom">
+      #content>
       <slot name="tooltip" />
-    </VTooltip>
-  </VBtn>
+    </template>
+  </JTooltip>
 </template>
-
-<script setup lang="ts">
-import { mergeProps } from 'vue';
-
-withDefaults(
-  defineProps<{
-    color?: string;
-    disabled?: boolean;
-  }>(),
-  { color: '', disabled: false }
-);
-</script>

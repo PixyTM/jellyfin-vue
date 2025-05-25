@@ -21,7 +21,7 @@ export function supportsMediaSource(): boolean {
    * Browsers that lack a media source implementation will have no reference
    * to |window.MediaSource|.
    */
-  return !!window.MediaSource;
+  return !!globalThis.MediaSource;
 }
 
 /**
@@ -92,7 +92,7 @@ export function isChrome(): boolean {
  * @returns Determines if current platform is from Apple
  */
 export function isApple(): boolean {
-  return navigator?.vendor.includes('Apple') && !isTizen();
+  return navigator.vendor.includes('Apple') && !isTizen();
 }
 
 /**
@@ -208,9 +208,9 @@ export function isWebOS(): boolean {
  */
 export function isWebOS1(): boolean {
   return (
-    isWebOS() &&
-    userAgentContains('AppleWebKit/537') &&
-    !userAgentContains('Chrome/')
+    isWebOS()
+    && userAgentContains('AppleWebKit/537')
+    && !userAgentContains('Chrome/')
   );
 }
 
@@ -219,9 +219,9 @@ export function isWebOS1(): boolean {
  */
 export function isWebOS2(): boolean {
   return (
-    isWebOS() &&
-    userAgentContains('AppleWebKit/538') &&
-    !userAgentContains('Chrome/')
+    isWebOS()
+    && userAgentContains('AppleWebKit/538')
+    && !userAgentContains('Chrome/')
   );
 }
 

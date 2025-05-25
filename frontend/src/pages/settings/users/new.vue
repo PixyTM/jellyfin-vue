@@ -1,5 +1,8 @@
 <template>
-  <SettingsPage page-title="newUser">
+  <SettingsPage>
+    <template #title>
+      {{ t('newUser') }}
+    </template>
     <template #actions>
       <VBtn
         variant="elevated"
@@ -14,7 +17,7 @@
         width="100%"
         height="100%">
         <VForm
-          class="py-5 px-2"
+          class="px-2 py-5"
           @submit.prevent="createUser">
           <VRow>
             <VCol>
@@ -52,7 +55,7 @@
                       :value="library.Id" />
                   </VCol>
                 </VRow>
-                <div class="text-warning ml-2">
+                <div class="ml-2 text-warning">
                   {{ t('libraryAccessNote') }}
                 </div>
               </VCard>
@@ -85,11 +88,11 @@ meta:
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
 import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api';
 import { ref } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router/auto';
-import { remote } from '@/plugins/remote';
+import { useTranslation } from 'i18next-vue';
+import { useRouter } from 'vue-router';
+import { remote } from '#/plugins/remote';
 
-const { t } = useI18n();
+const { t } = useTranslation();
 const router = useRouter();
 const name = ref('');
 const password = ref('');
@@ -97,7 +100,9 @@ const canAccessAllLibraries = ref(true);
 const accessableLibraries = ref<string[]>([]);
 const loading = ref(false);
 
-const libraries = (await remote.sdk.newUserApi(getLibraryApi).getMediaFolders({isHidden: false})).data;
+const libraries = (
+  await remote.sdk.newUserApi(getLibraryApi).getMediaFolders({ isHidden: false })
+).data;
 
 /**
  * Creates a new user
@@ -117,7 +122,7 @@ async function createUser(): Promise<void> {
     await remote.sdk.newUserApi(getUserApi).updateUserPolicy({
       userId: res.Id ?? '',
       userPolicy: {
-        ...res.Policy,
+        ...res.Policy!,
         EnableAllFolders: canAccessAllLibraries.value,
         ...(!canAccessAllLibraries.value && {
           EnabledFolders: accessableLibraries.value
@@ -130,5 +135,4 @@ async function createUser(): Promise<void> {
     loading.value = false;
   }
 }
-
 </script>

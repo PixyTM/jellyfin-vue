@@ -1,0 +1,36 @@
+{
+  "name": "@jellyfin-vue/shared",
+  "type": "module",
+  "description": "Shared code between Jellyfin Vue packages",
+  "exports": {
+    "./*": "./src/universal/*.ts",
+    "./node/*": "./src/node/*.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:inspect": "eslint-config-inspector",
+    "check:types": "vue-tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@jellyfin-vue/configs": "*"
+  },
+  "dependencies": {
+    "dompurify": "3.2.5",
+    "marked": "15.0.11"
+  },
+  "peerDependencies": {
+    "@vue/shared": "*",
+    "type-fest": "*",
+    "vitest": "*"
+  },
+  "peerDependenciesMeta": {
+    "type-fest": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  }
+}

@@ -1,5 +1,5 @@
 <template>
-  <VFabTransition>
+  <JTransition name="rotated-zoom">
     <VBtn
       v-show="y > 1"
       class="ma-4"
@@ -8,16 +8,14 @@
       location="bottom right"
       position="fixed"
       variant="elevated"
-      @click="scrollToTop">
-      <VIcon>
-        <IMdiChevronUp />
-      </VIcon>
+      @click.passive="scrollToTop">
+      <JIcon class="i-mdi:chevron-up" />
     </VBtn>
-  </VFabTransition>
+  </JTransition>
 </template>
 
 <script setup lang="ts">
-import { windowScroll } from '@/store';
+import { windowScroll } from '#/store';
 
 const { y } = windowScroll;
 

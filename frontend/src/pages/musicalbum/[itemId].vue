@@ -13,7 +13,7 @@
           cols="12"
           md="9">
           <h1
-            class="text-h4 font-weight-light"
+            class="text-h4"
             :class="{ 'text-center': !$vuetify.display.mdAndUp }">
             {{ item.Name }}
           </h1>
@@ -56,12 +56,12 @@
             cols="12"
             md="10">
             <VRow
-              v-if="item && item.GenreItems && item.GenreItems.length > 0"
+              v-if="item && item.GenreItems && item.GenreItems.length"
               align="center">
               <VCol
                 :cols="12"
                 :sm="2"
-                class="px-0 text-truncate">
+                class="text-truncate px-0">
                 <label class="text--secondary">{{ $t('genres') }}</label>
               </VCol>
               <VCol
@@ -90,7 +90,8 @@
         <VCol cols="12">
           <TrackList
             v-if="item.Type === 'MusicAlbum'"
-            :item="item" />
+            :item="item"
+            :tracks />
         </VCol>
       </VRow>
     </template>
@@ -103,24 +104,33 @@
 </template>
 
 <script setup lang="ts">
-import { ImageType } from '@jellyfin/sdk/lib/generated-client';
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
 import { getUserLibraryApi } from '@jellyfin/sdk/lib/utils/api/user-library-api';
-import { useRoute } from 'vue-router/auto';
-import { getItemDetailsLink } from '@/utils/items';
-import { getBlurhash } from '@/utils/images';
-import { useBaseItem } from '@/composables/apis';
+import { useRoute } from 'vue-router';
+import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
+import { SortOrder } from '@jellyfin/sdk/lib/generated-client';
+import { getItemDetailsLink } from '#/utils/items';
+import { useBaseItem } from '#/composables/apis';
+import { useItemBackdrop } from '#/composables/backdrop';
+import { useItemPageTitle } from '#/composables/page-title';
 
 const route = useRoute('/musicalbum/[itemId]');
 
-const { data: item } = await useBaseItem(getUserLibraryApi, 'getItem')(() => ({
-  itemId: route.params.itemId
-}));
-const { data: relatedItems } = await useBaseItem(getLibraryApi, 'getSimilarItems')(() => ({
-  itemId: route.params.itemId,
-  limit: 5
-}));
+const [{ data: item }, { data: relatedItems }, { data: tracks }] = await Promise.all([
+  useBaseItem(getUserLibraryApi, 'getItem')(() => ({
+    itemId: route.params.itemId
+  })),
+  useBaseItem(getLibraryApi, 'getSimilarItems')(() => ({
+    itemId: route.params.itemId,
+    limit: 5
+  })),
+  useBaseItem(getItemsApi, 'getItems')(() => ({
+    parentId: route.params.itemId,
+    sortBy: ['SortName'],
+    sortOrder: [SortOrder.Ascending]
+  }))
+]);
 
-route.meta.title = item.value.Name;
-route.meta.backdrop.blurhash = getBlurhash(item.value, ImageType.Backdrop);
+useItemPageTitle(item);
+useItemBackdrop(item);
 </script>

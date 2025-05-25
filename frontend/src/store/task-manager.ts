@@ -1,9 +1,9 @@
 import { v4 } from 'uuid';
 import { watch } from 'vue';
-import { CommonStore } from '@/store/super/common-store';
-import { remote } from '@/plugins/remote';
-import { apiStore } from '@/store/api';
-import { isArray, isObj, isStr, sealed } from '@/utils/validation';
+import { isArray, isNil, isObj, isStr, sealed } from '@jellyfin-vue/shared/validation';
+import { CommonStore } from '#/store/super/common-store';
+import { remote } from '#/plugins/remote';
+import { apiStore } from '#/store/dbs/api';
 
 /**
  * == INTERFACES AND TYPES ==
@@ -33,29 +33,25 @@ export interface RunningTask {
 }
 
 export interface TaskManagerState {
-  tasks: Array<RunningTask>;
-  /**
-   * The number of seconds to keep a finished task in the task list
-   */
-  finishedTasksTimeout: number;
+  tasks: RunningTask[];
 }
 
 /**
  * == CLASS CONSTRUCTOR ==
  */
 @sealed
-class TaskManagerStore extends CommonStore<TaskManagerState> {
+class TaskManagerStore extends CommonStore<TaskManagerState, 'tasks'> {
   /**
+   * == NON REACTIVE STATE AND UTILITY VARIABLES ==
    * Reactive state is defined in the super() constructor
    */
+  private readonly _finishedTasksTimeout = 5000;
   /**
    * == GETTERS AND SETTERS ==
    */
-  public get tasks(): typeof this._state.tasks {
-    return this._state.tasks;
-  }
   public readonly getTask = (id: string): RunningTask | undefined =>
-    this._state.tasks.find((payload) => payload.id === id);
+    this._state.value.tasks.find(payload => payload.id === id);
+
   /**
    * == ACTIONS ==
    */
@@ -66,29 +62,25 @@ class TaskManagerStore extends CommonStore<TaskManagerState> {
       );
     }
 
-    if (this.getTask(task.id) === undefined) {
-      this._state.tasks.push(task);
+    if (isNil(this.getTask(task.id))) {
+      this._state.value.tasks.push(task);
     }
   };
 
   public readonly finishTask = (id: string): void => {
     const clearTask = (): void => {
-      const taskIndex = this._state.tasks.findIndex(
-        (task) => task.id === id
+      const taskIndex = this._state.value.tasks.findIndex(
+        task => task.id === id
       );
 
-      this._state.tasks.splice(taskIndex, 1);
+      this._state.value.tasks.splice(taskIndex, 1);
     };
 
     const task = this.getTask(id);
 
     if (task) {
-      if (this._state.finishedTasksTimeout > 0) {
-        task.progress = 100;
-        window.setTimeout(clearTask, this._state.finishedTasksTimeout);
-      } else {
-        clearTask();
-      }
+      task.progress = 100;
+      globalThis.setTimeout(clearTask, this._finishedTasksTimeout);
     }
   };
 
@@ -104,20 +96,24 @@ class TaskManagerStore extends CommonStore<TaskManagerState> {
   };
 
   public constructor() {
-    super('taskManager', {
-      tasks: [],
-      finishedTasksTimeout: 5000
-    }, 'sessionStorage');
+    super({
+      defaultState: () => ({
+        tasks: []
+      }),
+      storeKey: 'taskManager',
+      persistenceType: 'sessionStorage',
+      resetOnLogout: true
+    });
 
     /**
      * Handle refresh progress update for library items
      */
-    const refreshProgressAction = (type: string, data: object): void => {
+    const refreshProgressAction = async (type: string, data: object) => {
       if (
-        type === 'RefreshProgress' &&
-          'ItemId' in data &&
-          isStr(data.ItemId) &&
-          'Progress' in data
+        type === 'RefreshProgress'
+        && 'ItemId' in data
+        && isStr(data.ItemId)
+        && 'Progress' in data
       ) {
         // TODO: Verify all the different tasks that this message may belong to - here we assume libraries.
 
@@ -128,8 +124,8 @@ class TaskManagerStore extends CommonStore<TaskManagerState> {
          * Start task if update its received and it doesn't exist in the store.
          * Usually when a running task is started somewhere else and the client is accssed later
          */
-        if (taskPayload === undefined) {
-          const item = apiStore.getItemById(data.ItemId);
+        if (isNil(taskPayload)) {
+          const item = await apiStore.getItemById(data.ItemId);
 
           if (item?.Id && item.Name) {
             this.startTask({
@@ -151,9 +147,9 @@ class TaskManagerStore extends CommonStore<TaskManagerState> {
      */
     const libraryChangedAction = (type: string, data: object): void => {
       if (
-        type === 'LibraryChanged' &&
-          'ItemsUpdated' in data &&
-          isArray(data.ItemsUpdated)
+        type === 'LibraryChanged'
+        && 'ItemsUpdated' in data
+        && isArray(data.ItemsUpdated)
       ) {
         for (const id of data.ItemsUpdated) {
           if (isStr(id)) {
@@ -176,18 +172,9 @@ class TaskManagerStore extends CommonStore<TaskManagerState> {
           return;
         }
 
-        refreshProgressAction(MessageType, Data);
+        void refreshProgressAction(MessageType, Data);
         libraryChangedAction(MessageType, Data);
       }
-    );
-
-    watch(
-      () => remote.auth.currentUser,
-      () => {
-        if (!remote.auth.currentUser) {
-          this._reset();
-        }
-      }, { flush: 'post' }
     );
   }
 }

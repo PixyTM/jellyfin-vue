@@ -1,8 +1,8 @@
 /**
- * @deprecated - Check @/utils/playback-profiles/index
+ * @deprecated - Check #/utils/playback-profiles/index
  */
 
-import { isWebOS } from '@/utils/browser-detection';
+import { isWebOS } from '#/utils/browser-detection';
 
 /**
  * Get an array of supported codecs
@@ -15,8 +15,8 @@ export function getSupportedWebMAudioCodecs(
   codecs.push('vorbis');
 
   if (
-    !isWebOS() &&
-    videoTestElement.canPlayType('audio/ogg; codecs="opus"').replace(/no/, '')
+    !isWebOS()
+    && videoTestElement.canPlayType('audio/ogg; codecs="opus"').replace(/no/, '')
   ) {
     codecs.push('opus');
   }

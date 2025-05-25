@@ -8,18 +8,23 @@
       </span>
       <VChip
         size="small"
-        class="ma-2 hidden-sm-and-down">
-        <template v-if="!fullQueryIsCached">
+        class="hidden-sm-and-down ma-2">
+        <template v-if="loading && items.length === lazyLoadLimit && initialId === route.params.itemId">
           {{ t('lazyLoading', { value: items.length }) }}
         </template>
+        <JProgressCircular
+          v-else-if="loading"
+          indeterminate
+          class="uno-h-full" />
         <template v-else>
-          {{ items?.length ?? 0 }}
+          {{ items.length ?? 0 }}
         </template>
       </VChip>
       <VDivider
-        inset
+
         vertical
-        class="mx-2 hidden-sm-and-down" />
+        inset
+        class="hidden-sm-and-down mx-2" />
       <TypeButton
         v-if="hasViewTypes"
         v-model="viewType"
@@ -62,7 +67,7 @@
 
 <script setup lang="ts">
 import {
-  BaseItemKind, SortOrder, type BaseItemDto
+  BaseItemKind, SortOrder
 } from '@jellyfin/sdk/lib/generated-client';
 import { getArtistsApi } from '@jellyfin/sdk/lib/utils/api/artists-api';
 import { getGenresApi } from '@jellyfin/sdk/lib/utils/api/genres-api';
@@ -71,17 +76,18 @@ import { getMusicGenresApi } from '@jellyfin/sdk/lib/utils/api/music-genres-api'
 import { getPersonsApi } from '@jellyfin/sdk/lib/utils/api/persons-api';
 import { getStudiosApi } from '@jellyfin/sdk/lib/utils/api/studios-api';
 import { computed, onBeforeMount, ref, shallowRef } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router/auto';
-import { apiStore } from '@/store/api';
-import { methodsAsObject, useBaseItem } from '@/composables/apis';
-import type { Filters } from '@/components/Buttons/FilterButton.vue';
+import { useTranslation } from 'i18next-vue';
+import { useRoute } from 'vue-router';
+import { useBaseItem } from '#/composables/apis';
+import type { Filters } from '#/components/Buttons/FilterButton.vue';
+import { useItemPageTitle } from '#/composables/page-title';
 
-const { t } = useI18n();
+const { t } = useTranslation();
 const route = useRoute('/library/[itemId]');
 
 const lazyLoadLimit = 50;
-const COLLECTION_TYPES_MAPPINGS: { [key: string]: BaseItemKind } = {
+const initialId = route.params.itemId;
+const COLLECTION_TYPES_MAPPINGS: Record<string, BaseItemKind> = {
   tvshows: BaseItemKind.Series,
   movies: BaseItemKind.Movie,
   books: BaseItemKind.Book,
@@ -93,7 +99,6 @@ const innerItemKind = shallowRef<BaseItemKind>();
 const sortBy = shallowRef<string>();
 const sortAscending = shallowRef(true);
 const queryLimit = shallowRef<number | undefined>(lazyLoadLimit);
-const lazyLoadIds = shallowRef<BaseItemDto['Id'][]>([]);
 const filters = ref<Filters>({
   status: [],
   features: [],
@@ -121,13 +126,13 @@ function onChangeFilter(changedFilters: Filters): void {
 const { data: libraryQuery } = await useBaseItem(getItemsApi, 'getItems')(() => ({
   ids: [route.params.itemId]
 }));
-const library = computed(() => libraryQuery.value?.[0]);
+const library = computed(() => libraryQuery.value[0]!);
 const viewType = computed({
   get() {
     if (innerItemKind.value) {
       return innerItemKind.value;
     } else {
-      return library.value?.CollectionType ? COLLECTION_TYPES_MAPPINGS[library.value.CollectionType] : undefined;
+      return library.value.CollectionType ? COLLECTION_TYPES_MAPPINGS[library.value.CollectionType] : undefined;
     }
   },
   set(newVal) {
@@ -140,66 +145,65 @@ const hasFilters = computed(() =>
 );
 const hasViewTypes = computed(
   () =>
-    library.value?.CollectionType === 'movies' ||
-    library.value?.CollectionType === 'music' ||
-    library.value?.CollectionType === 'tvshows'
+    library.value.CollectionType === 'movies'
+    || library.value.CollectionType === 'music'
+    || library.value.CollectionType === 'tvshows'
 );
 const isSortable = computed(
   () =>
-    viewType.value &&
+    viewType.value
     /**
      * Not everything is sortable, so depending on what we're showing, we need to hide the sort menu.
      * Reusing this as "isFilterable" too, since these seem to go hand in hand for now.
      */
-    ![
+    && ![
       'MusicArtist',
       'Person',
       'Genre',
-      'MusicGenre',
       'MusicGenre',
       'Studio'
     ].includes(viewType.value)
 );
 
 const recursive = computed(() =>
-  library.value?.CollectionType === 'homevideos' ||
-  library.value?.Type === 'Folder' ||
-  (library.value?.Type === 'CollectionFolder' &&
-  !('CollectionType' in library.value))
+  library.value.CollectionType === 'homevideos'
+  || library.value.Type === 'Folder'
+  || (library.value.Type === 'CollectionFolder'
+    && !('CollectionType' in library.value))
     ? undefined
     : true
 );
 
-const parentId = computed(() => library.value?.Id);
+const parentId = computed(() => library.value.Id);
 const methods = computed(() => {
   switch (viewType.value) {
     case 'MusicArtist': {
-      return methodsAsObject(getArtistsApi, 'getArtists');
+      return [getArtistsApi, 'getArtists'] as const;
     }
     case 'Person': {
-      return methodsAsObject(getPersonsApi, 'getPersons');
+      return [getPersonsApi, 'getPersons'] as const;
     }
     case 'Genre': {
-      return methodsAsObject(getGenresApi, 'getGenres');
+      return [getGenresApi, 'getGenres'] as const;
     }
     case 'MusicGenre': {
-      return methodsAsObject(getMusicGenresApi, 'getMusicGenres');
+      return [getMusicGenresApi, 'getMusicGenres'] as const;
     }
     case 'Studio': {
-      return methodsAsObject(getStudiosApi, 'getStudios');
+      return [getStudiosApi, 'getStudios'] as const;
     }
     default: {
-      return methodsAsObject(getItemsApi, 'getItems' );
+      return [getItemsApi, 'getItems'] as const;
     }
   }
 });
-const api = computed(() => methods.value.api);
-const method = computed(() => methods.value.methodName);
+const api = computed(() => methods.value[0]);
+const method = computed(() => methods.value[1]);
 
 /**
  * TODO: Improve the type situation of this statement
  */
-const { loading, data: queryItems } = await useBaseItem(api, method)(() => ({
+const { loading, data: items } = await useBaseItem(api, method)(() => ({
   parentId: parentId.value,
   personTypes: viewType.value === 'Person' ? ['Actor'] : undefined,
   includeItemTypes: viewType.value ? [viewType.value] : undefined,
@@ -218,29 +222,20 @@ const { loading, data: queryItems } = await useBaseItem(api, method)(() => ({
   isHd: filters.value.types.includes('isHD') || undefined,
   is4K: filters.value.types.includes('is4K') || undefined,
   is3D: filters.value.types.includes('is3D') || undefined,
-  startIndex: queryLimit.value ? undefined : lazyLoadLimit,
   limit: queryLimit.value
 }));
 
-/**
- * The queryItems for the 2nd request will return the items from (lazyloadLimit, n],
- * so checking if just the first matches is a good solution
- */
-const fullQueryIsCached = computed(() => loading.value ? !queryLimit.value && queryItems.value[0].Id !== lazyLoadIds.value[0] : true);
-const items = computed(() => fullQueryIsCached.value ? [...(apiStore.getItemsById(lazyLoadIds.value) as BaseItemDto[]), ...queryItems.value] : queryItems.value);
-
-route.meta.title = library.value.Name;
+useItemPageTitle(library);
 
 /**
- * We fetch the 1st 100 items and, after mount, we fetch the rest.
+ * We fetch the 1st 50 items and, after mount, we fetch the rest.
  */
 onBeforeMount(() => {
-  lazyLoadIds.value = queryItems.value.map((i) => i.Id);
   queryLimit.value = undefined;
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .empty-card-container {
   max-height: 90vh;
   overflow: hidden;

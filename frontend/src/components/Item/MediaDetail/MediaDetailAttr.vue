@@ -4,29 +4,26 @@
     <template v-if="!icon">
       {{ value }}
     </template>
-    <VIcon
+    <JIcon
       v-else
-      :icon="icon" />
+      :class="icon" />
   </p>
 </template>
 
 <script setup lang="ts">
-import IMdiCheck from 'virtual:icons/mdi/check';
-import IMdiClose from 'virtual:icons/mdi/close';
-import IMdiHelp from 'virtual:icons/mdi/help';
 import { computed } from 'vue';
-import { isBool } from '@/utils/validation';
+import { isBool } from '@jellyfin-vue/shared/validation';
 
-const props = defineProps<{
+const { name, value } = defineProps<{
   name: string;
   value?: string | number | boolean;
 }>();
 
 const icon = computed(() => {
-  if (isBool(props.value)) {
-    return props.value ? IMdiCheck : IMdiClose;
+  if (isBool(value)) {
+    return value ? 'i-mdi:check' : 'i-mdi:close';
   }
 
-  return props.value === 'undefined' ? IMdiHelp : undefined;
+  return value === 'undefined' ? 'i-mdi:help' : undefined;
 });
 </script>

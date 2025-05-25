@@ -17,16 +17,14 @@
         item-title="title"
         item-value="value"
         single-line
-        persistent-hint
         return-object
+        persistent-hint
         style="display: unset" />
-
       <VSpacer v-if="selectedMethod.value !== 'scan'" />
       <VCheckbox
         v-if="selectedMethod.value !== 'scan'"
         v-model="replace"
         :label="t('replaceExistingImages')" />
-
       <VCardActions
         class="d-flex align-center"
         :class="{
@@ -60,17 +58,17 @@ import type {
 } from '@jellyfin/sdk/lib/generated-client';
 import { getItemRefreshApi } from '@jellyfin/sdk/lib/utils/api/item-refresh-api';
 import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { TaskType, taskManager } from '@/store/task-manager';
-import { remote } from '@/plugins/remote';
-import { useSnackbar } from '@/composables/use-snackbar';
+import { useTranslation } from 'i18next-vue';
+import { TaskType, taskManager } from '#/store/task-manager';
+import { remote } from '#/plugins/remote';
+import { useSnackbar } from '#/composables/use-snackbar';
 
 interface RefreshMethod {
   title: string;
   value: 'scan' | 'missing' | 'all';
 }
 
-const props = defineProps<{
+const { item } = defineProps<{
   item: BaseItemDto;
 }>();
 
@@ -80,7 +78,7 @@ const emit = defineEmits<{
 const model = ref(true);
 const loading = ref(false);
 const replace = ref(false);
-const { t } = useI18n();
+const { t } = useTranslation();
 const selectedMethod = ref<RefreshMethod>({
   title: t('scanForNewAndUpdatedFiles'),
   value: 'scan'
@@ -122,7 +120,7 @@ const refreshMode = computed<MetadataRefreshMode>(() => {
 async function refreshMetadata(): Promise<void> {
   const replaceMetadata = selectedMethod.value.value === 'all';
 
-  if (!props.item.Id) {
+  if (!item.Id) {
     return;
   }
 
@@ -130,7 +128,7 @@ async function refreshMetadata(): Promise<void> {
     loading.value = true;
 
     await remote.sdk.newUserApi(getItemRefreshApi).refreshItem({
-      itemId: props.item.Id,
+      itemId: item.Id,
       metadataRefreshMode: refreshMode.value,
       imageRefreshMode: refreshMode.value,
       replaceAllMetadata: replaceMetadata,
@@ -139,8 +137,8 @@ async function refreshMetadata(): Promise<void> {
 
     taskManager.startTask({
       type: TaskType.LibraryRefresh,
-      id: props.item.Id || '',
-      data: props.item.Name ?? `ID ${props.item.Id}`,
+      id: item.Id || '',
+      data: item.Name ?? `ID ${item.Id}`,
       progress: 0
     });
 

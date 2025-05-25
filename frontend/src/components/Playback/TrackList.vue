@@ -1,12 +1,12 @@
 <template>
   <VTable
     density="compact"
-    class="track-table user-select-none">
+    class="track-table uno-select-none">
     <thead>
       <tr>
         <th
           style="width: 4em"
-          class="pr-0 text-center"
+          class="text-center pr-0"
           scope="col">
           #
         </th>
@@ -21,26 +21,22 @@
           style="width: 6.5em"
           class="text-center"
           scope="col">
-          <VIcon
-            class="text--primary"
-            size="16">
-            <IMdiClockOutline />
-          </VIcon>
+          <JIcon
+            class="i-mdi:clock-outline" />
         </th>
       </tr>
     </thead>
     <tbody>
       <template v-for="(tracksOnDisc, discNumber) in tracksPerDisc">
         <tr
-          v-if="Object.keys(tracksPerDisc).length > 1"
+          v-if="hasMultipleDiscs"
           :key="discNumber"
           class="disc-header">
           <td
             colspan="4"
             class="text--secondary">
-            <VIcon class="text--secondary">
-              <IMdiDisc />
-            </VIcon>
+            <JIcon
+              class="text--secondary i-mdi:disc" />
             {{ $t('discNumber', { discNumber }) }}
           </td>
         </tr>
@@ -59,9 +55,7 @@
                     size="small"
                     icon
                     @click="playTracks(track)">
-                    <VIcon>
-                      <IMdiPlayCircleOutline />
-                    </VIcon>
+                    <JIcon class="i-mdi:play-circle-outline" />
                   </VBtn>
                 </span>
                 <span v-else>{{ track.IndexNumber }}</span>
@@ -90,7 +84,7 @@
                         :to="getItemDetailsLink(artist, 'MusicArtist')"
                         custom>
                         <span
-                          class="link text--secondary"
+                          class="text--secondary link"
                           @click="navigate">
                           {{ artist.Name }}
                         </span>
@@ -115,54 +109,54 @@
 </template>
 
 <script setup lang="ts">
-import {
-  SortOrder,
-  type BaseItemDto
+import type {
+  BaseItemDto
 } from '@jellyfin/sdk/lib/generated-client';
-import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
-import { groupBy } from 'lodash-es';
 import { computed } from 'vue';
-import { useBaseItem } from '@/composables/apis';
-import { playbackManager } from '@/store/playback-manager';
-import { getItemDetailsLink } from '@/utils/items';
-import { formatTicks } from '@/utils/time';
+import { playbackManager } from '#/store/playback-manager';
+import { getItemDetailsLink } from '#/utils/items';
+import { formatTicks } from '#/utils/time';
 
-const props = defineProps<{
-  item: BaseItemDto
+const { item, tracks } = defineProps<{
+  item: BaseItemDto;
+  tracks: BaseItemDto[];
 }>();
 
-const { data: tracks } = await useBaseItem(getItemsApi, 'getItems')(() => ({
-  parentId: props.item.Id,
-  sortBy: ['SortName'],
-  sortOrder: [SortOrder.Ascending]
-}));
+const tracksPerDisc = computed(() => Object.groupBy(tracks, ({ ParentIndexNumber }) => ParentIndexNumber!));
+const hasMultipleDiscs = computed(() => {
+  let loops = 0;
 
-const tracksPerDisc = computed(() => {
-  return groupBy(tracks.value, 'ParentIndexNumber');
+  for (const _ in tracksPerDisc.value) {
+    loops++;
+
+    if (loops > 1) {
+      return true;
+    }
+  }
+
+  return false;
 });
 
 /**
  * Check if a given BaseItemDto is playing
  */
 function isPlaying(track: BaseItemDto): boolean {
-  return track.Id === playbackManager.currentItem?.Id;
+  return track.Id === playbackManager.currentItem.value?.Id;
 }
 
 /**
  * Play all the tracks from an item
  */
 async function playTracks(track: BaseItemDto): Promise<void> {
-  if (tracks.value) {
-    await playbackManager.play({
-      item: props.item,
-      startFromIndex: tracks.value.indexOf(track),
-      initiator: props.item
-    });
-  }
+  await playbackManager.play({
+    item: item,
+    startFromIndex: tracks.indexOf(track),
+    initiator: item
+  });
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .v-data-table.track-table {
   background-color: transparent;
 }

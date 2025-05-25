@@ -2,10 +2,10 @@
   <div>
     <VForm
       v-model="valid"
-      :disabled="loading"
+      :disabled="loading || disabled"
       @submit.prevent="userLogin">
       <VTextField
-        v-if="isEmpty(user)"
+        v-if="!user"
         v-model="login.username"
         variant="outlined"
         hide-details
@@ -18,13 +18,17 @@
         hide-details
         class="mt-4"
         :label="$t('password')"
-        :append-inner-icon="showPassword ? IconEyeOff : IconEye"
-        :type="showPassword ? 'text' : 'password'"
-        @click:append-inner="() => (showPassword = !showPassword)" />
+        :type="showPassword ? 'text' : 'password'">
+        <template #append-inner>
+          <JIcon
+            :class="showPassword ? 'i-mdi:eye-off' : 'i-mdi:eye'"
+            @click.passive="() => (showPassword = !showPassword)" />
+        </template>
+      </VTextField>
       <VCheckbox
         v-model="login.rememberMe"
         hide-details
-        class="mt-6 mb-6"
+        class="mb-6 mt-6"
         color="primary"
         :label="$t('rememberMe')" />
       <VRow
@@ -32,25 +36,26 @@
         no-gutters>
         <VCol class="mr-2">
           <VBtn
-            v-if="isEmpty(user) && jsonConfig.allowServerSelection"
+            v-if="!user && jsonConfig.allowServerSelection"
             to="/server/select"
             block
             size="large"
-            variant="elevated">
+            variant="elevated"
+            @click.prevent>
             {{ $t('changeServer') }}
           </VBtn>
           <VBtn
-            v-else
+            v-else-if="remote.auth.currentServer.value?.PublicUsers.length"
             block
             size="large"
             variant="elevated"
-            @click="$emit('change')">
+            @click.prevent="$emit('change')">
             {{ $t('changeUser') }}
           </VBtn>
         </VCol>
         <VCol class="mr-2">
           <VBtn
-            :disabled="!valid"
+            :disabled="!valid || disabled"
             :loading="loading"
             block
             size="large"
@@ -67,26 +72,19 @@
 
 <script setup lang="ts">
 import type { UserDto } from '@jellyfin/sdk/lib/generated-client';
-import { isEmpty } from 'lodash-es';
-import IconEye from 'virtual:icons/mdi/eye';
-import IconEyeOff from 'virtual:icons/mdi/eye-off';
 import { ref, shallowRef } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router/auto';
-import { fetchIndexPage } from '@/utils/items';
-import { remote } from '@/plugins/remote';
-import { getJSONConfig } from '@/utils/external-config';
+import { useTranslation } from 'i18next-vue';
+import { fetchIndexPage } from '#/utils/items';
+import { remote } from '#/plugins/remote';
+import { jsonConfig } from '#/utils/external-config';
 
-const props = defineProps<{ user: UserDto }>();
+const { user, disabled } = defineProps<{ user?: UserDto; disabled?: boolean }>();
 
 defineEmits<{
   change: [];
 }>();
 
-const jsonConfig = await getJSONConfig();
-const { t } = useI18n();
-
-const router = useRouter();
+const { t } = useTranslation();
 
 const valid = shallowRef(false);
 const login = ref({ username: '', password: '', rememberMe: true });
@@ -100,11 +98,11 @@ const rules = [
  * Login the user into the client
  */
 async function userLogin(): Promise<void> {
-  if (!isEmpty(props.user)) {
+  if (user) {
     /**
      * If we have a user from the public user selector, set it as login
      */
-    login.value.username = props.user.Name || '';
+    login.value.username = user.Name ?? '';
   }
 
   loading.value = true;
@@ -121,9 +119,7 @@ async function userLogin(): Promise<void> {
      * loading spinner active until we redirect the user.
      */
     await fetchIndexPage();
-
-    await router.replace('/');
-  } finally {
+  } catch {
     loading.value = false;
   }
 }

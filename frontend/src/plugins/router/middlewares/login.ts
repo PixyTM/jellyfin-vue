@@ -1,68 +1,79 @@
 import type {
-  RouteLocationNormalized,
-  RouteLocationPathRaw,
-  RouteLocationRaw
-} from 'vue-router/auto';
-import { effectScope } from 'vue';
-import { watchImmediate } from '@vueuse/core';
-import { remote } from '@/plugins/remote';
-import { isNil } from '@/utils/validation';
-import { getJSONConfig } from '@/utils/external-config';
+  NavigationGuardReturn,
+  RouteLocationNormalized
+} from 'vue-router';
+import type { RouteNamedMap } from 'vue-router/auto-routes';
+import { until } from '@vueuse/core';
+import { isNil } from '@jellyfin-vue/shared/validation';
+import i18next from 'i18next';
+import { remote } from '#/plugins/remote';
+import { jsonConfig } from '#/utils/external-config';
+import { useSnackbar } from '#/composables/use-snackbar';
 
 const serverAddUrl = '/server/add';
 const serverSelectUrl = '/server/select';
 const serverLoginUrl = '/server/login';
-const routes = new Set([serverAddUrl, serverSelectUrl, serverLoginUrl]);
+const serverWizard = '/wizard';
+const serverPages = new Set<keyof RouteNamedMap>([serverAddUrl, serverSelectUrl, serverLoginUrl, serverWizard]);
 
 /**
- * Waits for a server connection to be established for cases where there are default servers
- * defined and the server selection screen is disallowed.
+ * Gets the best server page based on the current state.
+ * Note that the final page rendered might differ from the best one here
+ * in the loginGuard
  */
-async function ensureServer(): Promise<void> {
-  const scope = effectScope();
-
-  await new Promise<void>((resolve) => {
-    scope.run(() => {
-      watchImmediate(() => remote.auth.currentServer, () => {
-        if (remote.auth.currentServer) {
-          resolve();
-        }
-      });
-    });
-  });
-  scope.stop();
-}
-
-/**
- * Redirects to login page if there's no user logged in.
- */
-export async function loginGuard(
-  to: RouteLocationNormalized
-): Promise<boolean | RouteLocationRaw> {
-  let destinationRoute: RouteLocationPathRaw | undefined;
-  const jsonConfig = await getJSONConfig();
-
-  if (!isNil(remote.auth.currentServer) && !isNil(remote.auth.currentUser) && !isNil(remote.auth.currentUserToken) && routes.has(to.path)) {
-    destinationRoute = { path: '/', replace: true };
+async function _getBestServerPage(): Promise<Nullish<keyof RouteNamedMap>> {
+  if (jsonConfig.defaultServerURLs.length && isNil(remote.auth.currentServer.value)) {
+    await until(remote.auth.currentServer).toBeTruthy({ flush: 'pre' });
   }
 
-  if (remote.auth.servers.length <= 0 && jsonConfig.defaultServerURLs.length <= 0) {
-    destinationRoute = { path: serverAddUrl, replace: true };
-  } else if (!routes.has(to.path)) {
-    if (isNil(remote.auth.currentServer)) {
-      if (jsonConfig.allowServerSelection) {
-        destinationRoute = { path: serverSelectUrl, replace: true };
-      } else {
-        await ensureServer();
+  if (!remote.auth.addedServers.value) {
+    return serverAddUrl;
+  } else if (isNil(remote.auth.currentServer.value)) {
+    return serverSelectUrl;
+  } else if (!remote.auth.currentServer.value.StartupWizardCompleted) {
+    return serverWizard;
+  }
+}
 
-        return loginGuard(to);
-      }
-    } else if (isNil(remote.auth.currentUser)) {
-      destinationRoute = { path: serverLoginUrl, replace: true };
+export const loginGuard = async (
+  to: RouteLocationNormalized,
+  from: RouteLocationNormalized
+): Promise<Exclude<NavigationGuardReturn, Error>> => {
+  const toServerPages = serverPages.has(to.name);
+
+  /**
+   * Do not allow the server selection pages if `allowServerSelection` is false in config.json,
+   * but do allow the login page.
+   */
+  if (!jsonConfig.allowServerSelection && (toServerPages && to.name !== serverLoginUrl)) {
+    return false;
+  }
+
+  const fromServerPages = serverPages.has(from.name);
+  const res = await _getBestServerPage();
+
+  const loggedIn = !isNil(remote.auth.currentUser.value);
+  const shouldBlockToServer = loggedIn && toServerPages;
+  const shouldBlockToApp = !loggedIn && !toServerPages;
+  const shouldBlock = shouldBlockToServer || shouldBlockToApp;
+  const shouldRedirectToHome = loggedIn && fromServerPages;
+  /**
+   * Redirections between server and app pages are freely allowed
+   */
+  const shouldRedirect = !isNil(res) || shouldBlockToApp || shouldRedirectToHome;
+
+  if (shouldRedirect) {
+    const name = loggedIn ? '/' : res ?? serverLoginUrl;
+
+    if (to.name !== name) {
+      return {
+        name,
+        replace: true
+      };
     }
-  }
+  } else if (shouldBlock) {
+    useSnackbar(i18next.t('unauthorized'), 'error');
 
-  return destinationRoute && to.path !== destinationRoute.path
-    ? destinationRoute
-    : true;
-}
+    return false;
+  }
+};

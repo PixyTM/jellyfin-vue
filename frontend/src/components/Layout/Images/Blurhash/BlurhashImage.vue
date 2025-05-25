@@ -1,90 +1,54 @@
 <template>
-  <div ref="imageElement">
+  <JOverlay>
     <JImg
-      class="absolute-cover img"
+      class="uno-h-full uno-w-full"
       :src="imageUrl"
+      :alt="item.Name ?? $t('unknown')"
       v-bind="$attrs">
       <template #placeholder>
-        <BlurhashCanvas
-          v-if="hash"
-          :hash="hash"
-          :width="width"
-          :height="height"
-          :punch="punch"
-          class="absolute-cover">
-          <BlurhashImageIcon :item="item" />
-        </BlurhashCanvas>
-        <BlurhashImageIcon
-          v-else
-          :item="item" />
+        <JOverlay>
+          <BlurhashCanvas
+            v-if="hash"
+            :hash="hash"
+            :width="width"
+            :height="height"
+            :punch="punch"
+            class="uno-h-full uno-w-full">
+            <BlurhashImageIcon
+              :item="item"
+              class="uno-z--1" />
+          </BlurhashCanvas>
+          <BlurhashImageIcon
+            v-else
+            :item="item" />
+        </JOverlay>
       </template>
-      <BlurhashImageIcon :item="item" />
     </JImg>
-  </div>
+  </JOverlay>
 </template>
 
-<script lang="ts">
+<script setup lang="ts">
 import {
   type BaseItemDto,
   type BaseItemPerson,
   ImageType
 } from '@jellyfin/sdk/lib/generated-client';
-import { refDebounced } from '@vueuse/core';
-import { computed, shallowRef } from 'vue';
-import { vuetify } from '@/plugins/vuetify';
-import { getBlurhash, getImageInfo } from '@/utils/images';
+import { computed } from 'vue';
+import { getBlurhash, getImageInfo } from '#/utils/images';
 
-/**
- * SHARED STATE ACROSS ALL THE COMPONENT INSTANCES
- */
-const display = vuetify.display;
-const displayWidth = refDebounced(display.width, 2000);
-const displayHeight = refDebounced(display.height, 2000);
+const { item, width, height, punch, type = ImageType.Primary } = defineProps<{
+  item: BaseItemDto | BaseItemPerson;
+  width?: number;
+  height?: number;
+  punch?: number;
+  type?: ImageType;
+}>();
+
+const imageUrl = computed(() => getImageInfo(item, {
+  preferThumb: type === ImageType.Thumb,
+  preferBanner: type === ImageType.Banner,
+  preferLogo: type === ImageType.Logo,
+  preferBackdrop: type === ImageType.Backdrop
+}).url);
+const hash = computed(() => getBlurhash(item, type));
 </script>
-
-<script setup lang="ts">
-const props = withDefaults(
-  defineProps<{
-    item: BaseItemDto | BaseItemPerson;
-    width?: number;
-    height?: number;
-    punch?: number;
-    type?: ImageType;
-  }>(),
-  { width: 32, height: 32, punch: 1, type: ImageType.Primary }
-);
-
-const imageElement = shallowRef<HTMLDivElement>();
-const imageUrl = computed(() => {
-  const element = imageElement.value;
-
-  /**
-   * We want to track the state of those dependencies
-   */
-  if (
-    element &&
-    displayWidth.value !== undefined &&
-    displayHeight.value !== undefined
-  ) {
-    const imageInfo = getImageInfo(props.item, {
-      preferThumb: props.type === ImageType.Thumb,
-      preferBanner: props.type === ImageType.Banner,
-      preferLogo: props.type === ImageType.Logo,
-      preferBackdrop: props.type === ImageType.Backdrop,
-      width: element?.clientWidth,
-      ratio: window.devicePixelRatio || 1
-    });
-
-    return imageInfo.url;
-  }
-});
-
-const hash = computed(() => getBlurhash(props.item, props.type));
-</script>
-
-<style lang="scss" scoped>
-.img {
-  color: transparent;
-  object-fit: cover;
-}
-</style>

@@ -9,30 +9,22 @@
         class="py-4">
         <div
           v-if="
-            systemInfo &&
-              $remote.auth.currentUser?.Policy?.IsAdministrator
+            remote.auth.currentServer.value &&
+              $remote.auth.currentUser?.value?.Policy?.IsAdministrator
           ">
-          <VImg
-            class="logo"
-            src="/icon.png"
+          <JImg
+            class="uno-h-25"
+            src="/icon.svg"
             :alt="$t('jellyfinLogo')" />
           <VTable class="mb-4 pb-2 information">
             <tbody>
               <tr>
                 <td>{{ $t('server') }}</td>
-                <td>{{ systemInfo.ServerName }}</td>
+                <td>{{ remote.auth.currentServer.value?.ServerName }}</td>
               </tr>
               <tr>
                 <td>{{ $t('serverVersion') }}</td>
-                <td>{{ systemInfo.Version }}</td>
-              </tr>
-              <tr>
-                <td>{{ $t('operatingSystem') }}</td>
-                <td>{{ systemInfo.OperatingSystemDisplayName }}</td>
-              </tr>
-              <tr>
-                <td>{{ $t('architecture') }}</td>
-                <td>{{ systemInfo.SystemArchitecture }}</td>
+                <td>{{ remote.auth.currentServer.value?.Version }}</td>
               </tr>
               <tr>
                 <td>{{ $t('vueClientVersion') }}</td>
@@ -63,9 +55,7 @@
               :disabled="!userItem.link">
               <template #prepend>
                 <VAvatar>
-                  <VIcon>
-                    <component :is="userItem.icon" />
-                  </VIcon>
+                  <JIcon :class="userItem.icon" />
                 </VAvatar>
               </template>
               <VListItemTitle>
@@ -76,16 +66,14 @@
               </VListItemSubtitle>
               <template #append>
                 <VListItemAction>
-                  <VIcon>
-                    <IMdiChevronRight />
-                  </VIcon>
+                  <JIcon class="i-mdi:chevron-right" />
                 </VListItemAction>
               </template>
             </VListItem>
           </VItemGroup>
         </VList>
         <!-- Administrator settings -->
-        <div v-if="$remote.auth.currentUser?.Policy?.IsAdministrator">
+        <div v-if="$remote.auth.currentUser.value?.Policy?.IsAdministrator">
           <VList
             v-for="(adminSection, index) in adminSections"
             :key="`admin-section-${index}`"
@@ -98,9 +86,7 @@
                 :disabled="!adminItem.link">
                 <template #prepend>
                   <VAvatar>
-                    <VIcon>
-                      <component :is="adminItem.icon" />
-                    </VIcon>
+                    <JIcon :class="adminItem.icon" />
                   </VAvatar>
                 </template>
                 <VListItemTitle>
@@ -111,9 +97,7 @@
                 </VListItemSubtitle>
                 <template #append>
                   <VListItemAction>
-                    <VIcon>
-                      <IMdiChevronRight />
-                    </VIcon>
+                    <JIcon class="i-mdi:chevron-right" />
                   </VListItemAction>
                 </template>
               </VListItem>
@@ -127,79 +111,56 @@
 </template>
 
 <script setup lang="ts">
-import { getSystemApi } from '@jellyfin/sdk/lib/utils/api/system-api';
 import { commit_hash } from 'virtual:commit';
-import IMdiAccount from 'virtual:icons/mdi/account';
-import IMdiAccountMultiple from 'virtual:icons/mdi/account-multiple';
-import IMdiBell from 'virtual:icons/mdi/bell';
-import IMdiCalendarClock from 'virtual:icons/mdi/calendar-clock';
-import IMdiDevices from 'virtual:icons/mdi/devices';
-import IMdiDiscPlayer from 'virtual:icons/mdi/disc-player';
-import IMdiDLNA from 'virtual:icons/mdi/dlna';
-import IMdiHome from 'virtual:icons/mdi/home';
-import IMdiKeyChain from 'virtual:icons/mdi/key-chain';
-import IMdiLibraryShelves from 'virtual:icons/mdi/library-shelves';
-import IMdiNetwork from 'virtual:icons/mdi/network';
-import IMdiPlayNetwork from 'virtual:icons/mdi/play-network';
-import IMdiPlayPause from 'virtual:icons/mdi/play-pause';
-import IMdiPuzzle from 'virtual:icons/mdi/puzzle';
-import IMdiServer from 'virtual:icons/mdi/server';
-import IMdiSubtitles from 'virtual:icons/mdi/subtitles';
-import IMdiTelevisionClassic from 'virtual:icons/mdi/television-classic';
-import IMdiTextBox from 'virtual:icons/mdi/text-box';
-import { computed, type Component } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRoute, type RouteLocationRaw } from 'vue-router/auto';
-import { remote } from '@/plugins/remote';
-import { useApi } from '@/composables/apis';
-import { version as clientVersion } from '@/../package.json';
+import { computed } from 'vue';
+import { useTranslation } from 'i18next-vue';
+import type { RouteLocationRaw } from 'vue-router';
+import { remote } from '#/plugins/remote';
+import { version as clientVersion } from '#/../package.json';
+import { usePageTitle } from '#/composables/page-title';
 
-const { t } = useI18n();
-const route = useRoute();
+const { t } = useTranslation();
 
 interface MenuOptions {
-  icon: Component;
+  icon: string;
   name: string;
   description: string;
-  link?: RouteLocationRaw
+  link?: RouteLocationRaw;
 }
 
-route.meta.title = t('settings');
-
-const method = computed(() => remote.auth.currentUser?.Policy?.IsAdministrator ? 'getSystemInfo' : undefined);
-const { data: systemInfo } = await useApi(getSystemApi, method)(() => ({}));
+usePageTitle(() => t('settings'));
 
 const userItems = computed<MenuOptions[]>(() => {
   return [
     {
-      icon: IMdiAccount,
+      icon: 'i-mdi:account',
       name: t('account'),
       description: t('accountSettingsDescription'),
       link: undefined
     },
     {
-      icon: IMdiHome,
+      icon: 'i-mdi:home',
       name: t('homeScreen'),
       description: t('homeScreenSettingsDescription'),
       link: undefined
     },
     {
-      icon: IMdiPlayPause,
+      icon: 'i-mdi:play-pause',
       name: t('playback'),
       description: t('playbackSettingsDescription'),
       link: undefined
     },
     {
-      icon: IMdiDiscPlayer,
+      icon: 'i-mdi:disc-player',
       name: t('mediaPlayers'),
       description: t('mediaPlayersSettingsDescription'),
       link: undefined
     },
     {
-      icon: IMdiSubtitles,
+      icon: 'i-mdi:subtitles',
       name: t('subtitles'),
       description: t('subtitlesSettingsDescription'),
-      link: undefined
+      link: '/settings/subtitles'
     }
   ];
 });
@@ -208,19 +169,19 @@ const adminSections = computed<MenuOptions[][]>(() => {
   return [
     [
       {
-        icon: IMdiServer,
+        icon: 'i-mdi:server',
         name: t('server'),
         description: t('serverSettingsDescription'),
-        link: undefined
+        link: '/settings/server'
       },
       {
-        icon: IMdiDevices,
+        icon: 'i-mdi:devices',
         name: t('devices'),
         description: t('devicesSettingsDescription'),
         link: '/settings/devices'
       },
       {
-        icon: IMdiLibraryShelves,
+        icon: 'i-mdi:library-shelves',
         name: t('libraries'),
         description: t('librariesSettingsDescription'),
         link: undefined
@@ -228,13 +189,13 @@ const adminSections = computed<MenuOptions[][]>(() => {
     ],
     [
       {
-        icon: IMdiAccountMultiple,
+        icon: 'i-mdi:account-multiple',
         name: t('users'),
         description: t('userSettingsDescription'),
         link: '/settings/users'
       },
       {
-        icon: IMdiKeyChain,
+        icon: 'i-mdi:key-chain',
         name: t('apiKeys'),
         description: t('apiKeysSettingsDescription'),
         link: '/settings/apikeys'
@@ -242,25 +203,25 @@ const adminSections = computed<MenuOptions[][]>(() => {
     ],
     [
       {
-        icon: IMdiPlayNetwork,
+        icon: 'i-mdi:play-network',
         name: t('transcodingAndStreaming'),
         description: t('transcodingSettingsDescription'),
         link: undefined
       },
       {
-        icon: IMdiDLNA,
+        icon: 'i-mdi:dlna',
         name: t('dlna'),
         description: t('dlnaSettingsDescription'),
         link: undefined
       },
       {
-        icon: IMdiTelevisionClassic,
+        icon: 'i-mdi:television-classic',
         name: t('liveTv'),
         description: t('liveTvSettingsDescription'),
         link: undefined
       },
       {
-        icon: IMdiNetwork,
+        icon: 'i-mdi:network',
         name: t('networking'),
         description: t('networkingSettingsDescription'),
         link: undefined
@@ -268,25 +229,25 @@ const adminSections = computed<MenuOptions[][]>(() => {
     ],
     [
       {
-        icon: IMdiPuzzle,
+        icon: 'i-mdi:puzzle',
         name: t('plugins'),
         description: t('pluginsSettingsDescription'),
         link: undefined
       },
       {
-        icon: IMdiCalendarClock,
+        icon: 'i-mdi:calendar-clock',
         name: t('scheduledTasks'),
         description: t('scheduledTasksSettingsDescription'),
         link: undefined
       },
       {
-        icon: IMdiBell,
+        icon: 'i-mdi:bell',
         name: t('notifications'),
         description: t('notificationsSettingsDescription'),
         link: undefined
       },
       {
-        icon: IMdiTextBox,
+        icon: 'i-mdi:text-box',
         name: t('logsAndActivity'),
         description: t('logsAndActivitySettingsDescription'),
         link: '/settings/logs-and-activity'
@@ -296,14 +257,9 @@ const adminSections = computed<MenuOptions[][]>(() => {
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .information td {
   height: 3.4em !important;
   border-bottom: 0 !important;
-}
-
-.logo {
-  background: rgb(var(--v-theme-card));
-  height: 100px;
 }
 </style>

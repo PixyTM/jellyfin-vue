@@ -1,14 +1,12 @@
 <template>
   <VBtn
-    v-if="options.length > 0"
+    v-if="options.length"
     :variant="outlined ? 'outlined' : undefined"
     icon
     size="small"
     @click.stop.prevent="onActivatorClick"
     @contextmenu.stop.prevent="onRightClick">
-    <VIcon>
-      <IMdiDotsVertical />
-    </VIcon>
+    <JIcon class="i-mdi:dots-vertical" />
     <VMenu
       v-model="show"
       :persistent="false"
@@ -20,7 +18,7 @@
       <VList nav>
         <template v-for="(section, index1) in options">
           <VDivider
-            v-if="section.length > 0 && index1 > 0"
+            v-if="section.length && index1 > 0"
             :key="`item-${item.Id}-section-${index1}-divider`" />
           <VListItem
             v-for="(menuOption, index2) in section"
@@ -28,8 +26,13 @@
             class="text"
             :disabled="menuOption.disabled"
             :title="menuOption.title"
-            :prepend-icon="menuOption.icon"
-            @click="menuOption.action" />
+            @click="menuOption.action">
+            <template #prepend>
+              <JIcon
+                :class="menuOption.icon"
+                class="uno-w-10" />
+            </template>
+          </VListItem>
         </template>
       </VList>
     </VMenu>
@@ -40,15 +43,15 @@
     @close="metadataDialog = false" />
   <RefreshMetadataDialog
     v-if="refreshDialog && item.Id"
-    :item="menuProps.item"
+    :item="item"
     @close="refreshDialog = false" />
   <IdentifyDialog
     v-if="identifyItemDialog && item.Id"
-    :item="menuProps.item"
+    :item="item"
     @close="identifyItemDialog = false" />
   <MediaDetailDialog
     v-if="mediaInfoDialog && item.Id"
-    :item="menuProps.item"
+    :item="item"
     :media-source-index="mediaSourceIndex"
     @close="mediaInfoDialog = false" />
 </template>
@@ -56,25 +59,10 @@
 <script lang="ts">
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client';
 import { useClipboard, useEventListener } from '@vueuse/core';
-import { v4 } from 'uuid';
-import IMdiArrowExpandDown from 'virtual:icons/mdi/arrow-expand-down';
-import IMdiArrowExpandUp from 'virtual:icons/mdi/arrow-expand-up';
-import IMdiCloudSearch from 'virtual:icons/mdi/cloud-search-outline';
-import IMdiContentCopy from 'virtual:icons/mdi/content-copy';
-import IMdiDelete from 'virtual:icons/mdi/delete';
-import IMdiDisc from 'virtual:icons/mdi/disc';
-import IMdiInformation from 'virtual:icons/mdi/information';
-import IMdiPencilOutline from 'virtual:icons/mdi/pencil-outline';
-import IMdiPlaySpeed from 'virtual:icons/mdi/play-speed';
-import IMdiPlaylistMinus from 'virtual:icons/mdi/playlist-minus';
-import IMdiPlaylistPlus from 'virtual:icons/mdi/playlist-plus';
-import IMdiRefresh from 'virtual:icons/mdi/refresh';
-import IMdiReplay from 'virtual:icons/mdi/replay';
-import IMdiShuffle from 'virtual:icons/mdi/shuffle';
-import { computed, getCurrentInstance, onMounted, shallowRef, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router/auto';
-import { isStr } from '@/utils/validation';
+import { computed, getCurrentInstance, onMounted, shallowRef, useId, watch } from 'vue';
+import { useTranslation } from 'i18next-vue';
+import { useRoute, useRouter } from 'vue-router';
+import { isNil, isStr } from '@jellyfin-vue/shared/validation';
 import {
   canIdentify,
   canInstantMix,
@@ -84,20 +72,20 @@ import {
   getItemIdFromSourceIndex,
   getItemSeasonDownloadMap,
   getItemSeriesDownloadMap
-} from '@/utils/items';
-import { taskManager } from '@/store/task-manager';
-import { playbackManager } from '@/store/playback-manager';
-import { apiStore } from '@/store/api';
-import { remote } from '@/plugins/remote';
-import { useSnackbar } from '@/composables/use-snackbar';
-import { useConfirmDialog } from '@/composables/use-confirm-dialog';
+} from '#/utils/items';
+import { taskManager } from '#/store/task-manager';
+import { playbackManager } from '#/store/playback-manager';
+import { apiStore } from '#/store/dbs/api';
+import { remote } from '#/plugins/remote';
+import { useSnackbar } from '#/composables/use-snackbar';
+import { useConfirmDialog } from '#/composables/use-confirm-dialog';
 
-type MenuOption = {
+interface MenuOption {
   title: string;
-  icon: typeof IMdiPlaySpeed;
+  icon: string;
   action: () => void;
   disabled?: boolean;
-};
+}
 
 /**
  * SHARED STATE ACROSS ALL THE COMPONENT INSTANCES
@@ -106,31 +94,21 @@ const openMenu = shallowRef<string>();
 </script>
 
 <script setup lang="ts">
-const menuProps = withDefaults(
-  defineProps<{
-    item: BaseItemDto;
-    outlined?: boolean;
-    zIndex?: number;
-    rightClick?: boolean;
-    queue?: boolean;
-    mediaSourceIndex?: number;
-  }>(),
-  {
-    outlined: false,
-    zIndex: 1000,
-    rightClick: true,
-    queue: false,
-    mediaSourceIndex: undefined
-  }
-);
+const { item, outlined, zIndex = 1000, queue, mediaSourceIndex } = defineProps<{
+  item: BaseItemDto;
+  outlined?: boolean;
+  zIndex?: number;
+  queue?: boolean;
+  mediaSourceIndex?: number;
+}>();
 
 const emit = defineEmits<{
   active: [];
   inactive: [];
 }>();
 
-const { t } = useI18n();
-const instanceId = v4();
+const { t } = useTranslation();
+const instanceId = useId();
 const router = useRouter();
 const route = useRoute();
 
@@ -150,7 +128,7 @@ const show = computed({
 
 const itemId = computed(
   () => getItemIdFromSourceIndex(
-    menuProps.item, menuProps.mediaSourceIndex
+    item, mediaSourceIndex
   )
 );
 const positionX = shallowRef<number | undefined>();
@@ -162,18 +140,17 @@ const mediaInfoDialog = shallowRef(false);
 
 const isActive = computed(() => show.value || metadataDialog.value || refreshDialog.value || identifyItemDialog.value || mediaInfoDialog.value);
 
-watch(isActive, (newVal) => {
-  newVal ? emit('active') : emit('inactive');
-});
+watch(isActive, newVal =>
+  emit(newVal ? 'active' : 'inactive')
+);
 
 const errorMessage = t('anErrorHappened');
 const isItemRefreshing = computed(
-  () => taskManager.getTask(menuProps.item.Id ?? '') !== undefined
+  () => !isNil(taskManager.getTask(item.Id ?? ''))
 );
 const itemDeletionName = computed(() => {
-  const parentName = menuProps.item.Name ?? undefined;
-  const mediaSource =
-    menuProps.item.MediaSources?.[menuProps.mediaSourceIndex ?? -1];
+  const parentName = item.Name ?? undefined;
+  const mediaSource = item.MediaSources?.[mediaSourceIndex ?? -1];
 
   if (mediaSource?.Name) {
     let name = mediaSource.Name;
@@ -196,71 +173,71 @@ const itemDeletionName = computed(() => {
  */
 const playNextAction = {
   title: t('playNext'),
-  icon: IMdiPlaySpeed,
+  icon: 'i-mdi:play-speed',
   action: async (): Promise<void> => {
-    await playbackManager.playNext(menuProps.item);
+    await playbackManager.playNext(item);
     useSnackbar(t('itemPlayNext'), 'success');
   }
 };
 const pushToTopOfQueueAction = {
   title: t('pushToTop'),
-  icon: IMdiArrowExpandUp,
+  icon: 'i-mdi:arrow-expand-up',
   action: (): void => {
-    playbackManager.changeItemPosition(menuProps.item.Id, 0);
+    playbackManager.changeItemPosition(item.Id, 0);
   }
 };
 const removeFromQueueAction = {
   title: t('removeFromQueue'),
-  icon: IMdiPlaylistMinus,
+  icon: 'i-mdi:playlist-minus',
   action: (): void => {
-    playbackManager.removeFromQueue(menuProps.item.Id || '');
+    playbackManager.removeFromQueue(item.Id ?? '');
   }
 };
 const pushToBottomOfQueueAction = {
   title: t('pushToBottom'),
-  icon: IMdiArrowExpandDown,
+  icon: 'i-mdi:arrow-expand-down',
   action: (): void => {
     playbackManager.changeItemPosition(
-      menuProps.item.Id,
-      playbackManager.queue.length - 1
+      item.Id,
+      playbackManager.queueLength.value - 1
     );
   }
 };
 const playFromBeginningAction = {
   title: t('playFromBeginning'),
-  icon: IMdiReplay,
+  icon: 'i-mdi:replay',
   action: async (): Promise<void> => {
     await playbackManager.play({
-      item: menuProps.item
+      item: item
     });
   }
 };
 const shuffleAction = {
   title: t('shuffle'),
-  icon: IMdiShuffle,
+  icon: 'i-mdi:shuffle',
   action: async (): Promise<void> => {
     await playbackManager.play({
-      item: menuProps.item,
-      initiator: menuProps.item,
+      item: item,
+      initiator: item,
       startShuffled: true
     });
   }
 };
 const addToQueueAction = {
   title: t('addToQueue'),
-  icon: IMdiPlaylistPlus,
+  icon: 'i-mdi:playlist-plus',
   action: async (): Promise<void> => {
-    await playbackManager.addToQueue(menuProps.item);
+    await playbackManager.addToQueue(item);
     useSnackbar(t('addedToQueue'), 'success');
   }
 };
 const instantMixAction = {
   title: t('instantMix'),
-  icon: IMdiDisc,
+  icon: 'i-mdi:disc',
   action: async (): Promise<void> => {
-    if (menuProps.item.Id) {
+    if (item.Id) {
       try {
-        await playbackManager.instantMixFromItem(menuProps.item.Id);
+        await playbackManager.instantMixFromItem(item.Id);
         useSnackbar(t('instantMixQueued'), 'success');
       } catch {
         useSnackbar(errorMessage, 'error');
@@ -273,14 +250,14 @@ const instantMixAction = {
  */
 const mediaInfoAction = {
   title: t('mediaInfo'),
-  icon: IMdiInformation,
+  icon: 'i-mdi:information',
   action: (): void => {
     mediaInfoDialog.value = true;
   }
 };
 const refreshAction = {
   title: t('refreshMetadata'),
-  icon: IMdiRefresh,
+  icon: 'i-mdi:refresh',
   action: (): void => {
     refreshDialog.value = true;
   },
@@ -288,14 +265,14 @@ const refreshAction = {
 };
 const editMetadataAction = {
   title: t('editMetadata'),
-  icon: IMdiPencilOutline,
+  icon: 'i-mdi:pencil-outline',
   action: (): void => {
     metadataDialog.value = true;
   }
 };
 const deleteItemAction = {
   title: t('deleteItem'),
-  icon: IMdiDelete,
+  icon: 'i-mdi:delete',
   action: async (): Promise<void> => {
     await useConfirmDialog(
       async () => {
@@ -306,7 +283,7 @@ const deleteItemAction = {
         try {
           await apiStore.itemDelete(itemId.value);
 
-          if (itemId.value === menuProps.item.Id && route.fullPath.includes(itemId.value)) {
+          if (itemId.value === item.Id && route.fullPath.includes(itemId.value)) {
             await router.replace('/');
           }
         } catch (error) {
@@ -326,14 +303,14 @@ const deleteItemAction = {
 };
 const identifyItemAction = {
   title: t('identify'),
-  icon: IMdiCloudSearch,
+  icon: 'i-mdi:cloud-search',
   action: (): void => {
     identifyItemDialog.value = true;
   }
 };
 const copyDownloadURLAction = {
   title: t('copyStreamURL'),
-  icon: IMdiContentCopy,
+  icon: 'i-mdi:content-copy',
   action: async (): Promise<void> => {
     const clipboard = useClipboard();
     let streamUrls: Map<string, string> | string | undefined;
@@ -344,14 +321,14 @@ const copyDownloadURLAction = {
       return;
     }
 
-    if (menuProps.item.Id) {
-      switch (menuProps.item.Type) {
+    if (item.Id) {
+      switch (item.Type) {
         case 'Season': {
-          streamUrls = await getItemSeasonDownloadMap(menuProps.item.Id);
+          streamUrls = await getItemSeasonDownloadMap(item.Id);
           break;
         }
         case 'Series': {
-          streamUrls = await getItemSeriesDownloadMap(menuProps.item.Id);
+          streamUrls = await getItemSeriesDownloadMap(item.Id);
           break;
         }
         default: {
@@ -363,8 +340,8 @@ const copyDownloadURLAction = {
       /**
        * The Map is mapped to an string like: EpisodeName: DownloadUrl
        */
-      const text =
-        streamUrls instanceof Map
+      const text
+        = streamUrls instanceof Map
           ? [...streamUrls.entries()]
               .map(([k, v]) => `(${k}) - ${v}`)
               .join('\n')
@@ -378,11 +355,14 @@ const copyDownloadURLAction = {
       if (text) {
         await (isStr(streamUrls)
           ? copyAction(text)
-          : useConfirmDialog(async () => await copyAction(text), {
-            title: t('copyPrompt'),
-            text: text,
-            confirmText: t('accept')
-          }));
+          : useConfirmDialog(async () => await copyAction(text),
+              {
+                title: t('copyPrompt'),
+                text: text,
+                confirmText: t('accept')
+              }
+            )
+        );
       } else {
         useSnackbar(errorMessage, 'error');
       }
@@ -400,18 +380,18 @@ function getQueueOptions(): MenuOption[] {
   const queueOptions: MenuOption[] = [];
 
   if (
-    menuProps.queue &&
-    playbackManager.queueIds.includes(menuProps.item.Id || '')
+    queue
+    && playbackManager.queueHasItem(item.Id ?? '')
   ) {
     queueOptions.push(pushToTopOfQueueAction);
 
-    if (playbackManager.currentItem?.Id !== menuProps.item.Id) {
+    if (playbackManager.currentItem.value?.Id !== item.Id) {
       queueOptions.push(removeFromQueueAction);
     }
 
     if (
-      playbackManager.nextItem?.Id !== menuProps.item.Id &&
-      playbackManager.currentItem?.Id !== menuProps.item.Id
+      playbackManager.nextItem.value?.Id !== item.Id
+      && playbackManager.currentItem.value?.Id !== item.Id
     ) {
       queueOptions.push(playNextAction);
     }
@@ -428,17 +408,17 @@ function getQueueOptions(): MenuOption[] {
 function getPlaybackOptions(): MenuOption[] {
   const playbackOptions: MenuOption[] = [];
 
-  if (canResume(menuProps.item)) {
+  if (canResume(item)) {
     playbackOptions.push(playFromBeginningAction);
   }
 
   playbackOptions.push(shuffleAction);
 
-  if (playbackManager.currentItem) {
+  if (playbackManager.currentItem.value) {
     if (
-      playbackManager.nextItem?.Id !== menuProps.item.Id &&
-      playbackManager.currentItem?.Id !== menuProps.item.Id &&
-      !menuProps.queue
+      playbackManager.nextItem.value?.Id !== item.Id
+      && playbackManager.currentItem.value.Id !== item.Id
+      && !queue
     ) {
       playbackOptions.push(playNextAction);
     }
@@ -446,7 +426,7 @@ function getPlaybackOptions(): MenuOption[] {
     playbackOptions.push(addToQueueAction);
   }
 
-  if (canInstantMix(menuProps.item) && playbackManager.currentItem) {
+  if (canInstantMix(item) && playbackManager.currentItem.value) {
     playbackOptions.push(instantMixAction);
   }
 
@@ -459,7 +439,7 @@ function getPlaybackOptions(): MenuOption[] {
 function getCopyOptions(): MenuOption[] {
   const copyActions: MenuOption[] = [];
 
-  if (remote.auth.currentUser?.Policy?.EnableContentDownloading) {
+  if (remote.auth.currentUser.value?.Policy?.EnableContentDownloading) {
     copyActions.push(copyDownloadURLAction);
   }
 
@@ -472,25 +452,25 @@ function getCopyOptions(): MenuOption[] {
 function getLibraryOptions(): MenuOption[] {
   const libraryOptions: MenuOption[] = [];
 
-  if (menuProps.item.MediaSources) {
+  if (item.MediaSources) {
     libraryOptions.push(mediaInfoAction);
   }
 
-  if (canRefreshMetadata(menuProps.item)) {
+  if (canRefreshMetadata(item)) {
     libraryOptions.push(refreshAction);
   }
 
-  if (remote.auth.currentUser?.Policy?.IsAdministrator) {
+  if (remote.auth.currentUser.value?.Policy?.IsAdministrator) {
     libraryOptions.push(editMetadataAction);
 
-    if (canIdentify(menuProps.item)) {
+    if (canIdentify(item)) {
       libraryOptions.push(identifyItemAction);
     }
   }
 
   if (
-    remote.auth.currentUser?.Policy?.EnableContentDeletion ||
-    remote.auth.currentUser?.Policy?.EnableContentDeletionFromFolders
+    remote.auth.currentUser.value?.Policy?.EnableContentDeletion
+    || remote.auth.currentUser.value?.Policy?.EnableContentDeletionFromFolders
   ) {
     libraryOptions.push(deleteItemAction);
   }
@@ -535,7 +515,7 @@ onMounted(() => {
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .text {
   font-size: unset !important;
   line-height: unset !important;

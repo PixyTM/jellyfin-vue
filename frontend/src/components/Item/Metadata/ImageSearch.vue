@@ -11,7 +11,7 @@
       <VDivider />
       <VRow
         align="center"
-        class="mx-16 my-4">
+        class="my-4 mx-16">
         <VSelect
           v-model="source"
           class="mx-4"
@@ -19,10 +19,10 @@
           :disabled="loading"
           :label="t('source')"
           :placeholder="t('all')"
-          persistent-placeholder
           variant="outlined"
           hide-details
-          clearable />
+          clearable
+          persistent-placeholder />
         <VSelect
           v-model="type"
           class="mx-4"
@@ -35,17 +35,14 @@
           hide-details />
         <VCheckbox
           v-model="allLanguages"
-          class="mt-0 mx-4"
+          class="mx-4 mt-0"
           :label="t('allLanguages')"
           :disabled="loading"
           hide-details />
       </VRow>
       <VDivider />
-      <VProgressCircular
+      <JProgressCircular
         v-if="loading"
-        :size="70"
-        :width="7"
-        color="primary"
         indeterminate
         class="loading-bar" />
       <VCard
@@ -67,10 +64,10 @@
           sm="6"
           cols="12">
           <VCard class="ma-2">
-            <VImg
+            <JImg
               v-if="item.Url"
-              :src="item.Url"
-              :aspect-ratio="getContainerAspectRatioForImageType(item.Type)" />
+              :alt="$t('imageSearchResult')"
+              :src="item.Url" />
             <div class="text-center text-truncate text-subtitle-1 mt-2">
               {{ item.ProviderName }}
             </div>
@@ -100,9 +97,7 @@
                 icon
                 :disabled="loading"
                 @click="onDownload(item)">
-                <VIcon>
-                  <IMdiCloudDownload />
-                </VIcon>
+                <JIcon class="i-mdi:cloud-download" />
               </VBtn>
             </VCardActions>
           </VCard>
@@ -121,12 +116,11 @@ import {
 } from '@jellyfin/sdk/lib/generated-client';
 import { getRemoteImageApi } from '@jellyfin/sdk/lib/utils/api/remote-image-api';
 import { computed, ref, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { getContainerAspectRatioForImageType } from '@/utils/images';
-import { getLocaleName } from '@/utils/i18n';
-import { remote } from '@/plugins/remote';
+import { useTranslation } from 'i18next-vue';
+import { getLocaleName } from '#/utils/i18n';
+import { remote } from '#/plugins/remote';
 
-const props = defineProps<{
+const { metadata, dialog } = defineProps<{
   metadata: BaseItemDto;
   dialog: boolean;
 }>();
@@ -136,7 +130,7 @@ const emit = defineEmits<{
   'download-success': [someting: boolean];
 }>();
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const providers = ref<ImageProviderInfo[]>([]);
 const type = ref<ImageType>(ImageType.Primary);
@@ -195,25 +189,24 @@ const types = computed(() => [
 const sources = computed(() =>
   providers.value
     .filter(
-      (provider) =>
-        provider.Name &&
-        provider.SupportedImages &&
-        provider.SupportedImages.includes(type.value)
+      provider =>
+        provider.Name
+        && provider.SupportedImages?.includes(type.value)
     )
-    .map((provider) => provider.Name ?? '')
+    .map(provider => provider.Name ?? '')
 );
 
 /**
  * Returns a list of image providers for the current item
  */
 async function getRemoteImageProviders(): Promise<void> {
-  if (!props.metadata.Id) {
+  if (!metadata.Id) {
     return;
   }
 
   providers.value = (
     await remote.sdk.newUserApi(getRemoteImageApi).getRemoteImageProviders({
-      itemId: props.metadata.Id
+      itemId: metadata.Id
     })
   ).data;
 }
@@ -222,15 +215,15 @@ async function getRemoteImageProviders(): Promise<void> {
  * Fetches the image information for the currently selected item given the filters
  */
 async function getImages(): Promise<void> {
-  if (!props.metadata.Id) {
+  if (!metadata.Id) {
     return;
   }
 
   loading.value = true;
-  images.value =
-    (
+  images.value
+    = (
       await remote.sdk.newUserApi(getRemoteImageApi).getRemoteImages({
-        itemId: props.metadata.Id,
+        itemId: metadata.Id,
         type: type.value,
         providerName: source.value ?? undefined,
         includeAllLanguages: allLanguages.value
@@ -244,13 +237,13 @@ async function getImages(): Promise<void> {
  * Handles downloading an image given the image info
  */
 async function onDownload(item: RemoteImageInfo): Promise<void> {
-  if (!item.Type || !item.Url || !props.metadata.Id) {
+  if (!item.Type || !item.Url || !metadata.Id) {
     return;
   }
 
   loading.value = true;
   await remote.sdk.newUserApi(getRemoteImageApi).downloadRemoteImage({
-    itemId: props.metadata.Id,
+    itemId: metadata.Id,
     type: item.Type,
     imageUrl: item.Url
   });
@@ -273,7 +266,7 @@ function reset(): void {
 
 watch([type, source, allLanguages], getImages);
 watch(
-  () => props.dialog,
+  () => dialog,
   async (dialog) => {
     if (dialog) {
       await getRemoteImageProviders();
@@ -285,7 +278,7 @@ watch(
 );
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .loading-bar {
   position: absolute;
   top: 50%;

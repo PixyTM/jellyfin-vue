@@ -1,5 +1,5 @@
 /**
- * @deprecated - Check @/utils/playback-profiles/index
+ * @deprecated - Check #/utils/playback-profiles/index
  */
 
 import {
@@ -7,7 +7,7 @@ import {
   isTizen,
   isTv,
   supportsMediaSource
-} from '@/utils/browser-detection';
+} from '#/utils/browser-detection';
 
 /**
  * Checks if the client can play native HLS
@@ -21,8 +21,8 @@ export function canPlayNativeHls(videoTestElement: HTMLVideoElement): boolean {
   }
 
   return !!(
-    videoTestElement.canPlayType('application/x-mpegURL').replace(/no/, '') ||
-    videoTestElement
+    videoTestElement.canPlayType('application/x-mpegURL').replace(/no/, '')
+    || videoTestElement
       .canPlayType('application/vnd.apple.mpegURL')
       .replace(/no/, '')
   );
@@ -44,8 +44,8 @@ export function hasMkvSupport(videoTestElement: HTMLVideoElement): boolean {
   }
 
   if (
-    videoTestElement.canPlayType('video/x-matroska').replace(/no/, '') ||
-    videoTestElement.canPlayType('video/mkv').replace(/no/, '')
+    videoTestElement.canPlayType('video/x-matroska').replace(/no/, '')
+    || videoTestElement.canPlayType('video/mkv').replace(/no/, '')
   ) {
     return true;
   }

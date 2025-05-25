@@ -34,19 +34,19 @@
 <script setup lang="ts">
 import { getApiKeyApi } from '@jellyfin/sdk/lib/utils/api/api-key-api';
 import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { useTranslation } from 'i18next-vue';
 import { useDisplay } from 'vuetify';
-import { remote } from '@/plugins/remote';
-import { useSnackbar } from '@/composables/use-snackbar';
+import { remote } from '#/plugins/remote';
+import { useSnackbar } from '#/composables/use-snackbar';
 
-defineProps<{ addingNewKey: boolean }>();
+const { addingNewKey } = defineProps<{ addingNewKey: boolean }>();
 
 const emit = defineEmits<{
   keyAdded: [];
   close: [];
 }>();
 
-const { t } = useI18n();
+const { t } = useTranslation();
 const display = useDisplay();
 
 const newKeyAppName = ref('');
@@ -92,7 +92,7 @@ async function addApiKey(): Promise<void> {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .add-key-form {
   width: 100%;
 }

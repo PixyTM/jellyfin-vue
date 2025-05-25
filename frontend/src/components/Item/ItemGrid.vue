@@ -1,34 +1,37 @@
 <template>
   <div :class="large ? useResponsiveClasses('large-grid') : undefined">
-    <VirtualGrid
-      v-if="items.length > 0 && !noVirtual"
-      v-slot="{ item, style }"
-      :items="items"
-      :class="useResponsiveClasses('card-grid-container')">
-      <ItemCard
-        :style="style"
-        :item="item"
-        margin
-        text
-        overlay
-        link />
-    </VirtualGrid>
-    <div
-      v-else-if="items.length > 0 && noVirtual"
-      :class="useResponsiveClasses('card-grid-container')">
-      <template
-        v-for="item of items"
-        :key="item.Id">
+    <template v-if="items.length">
+      <JVirtual
+        v-if="!noVirtual"
+        v-slot="{ item }"
+        :items="items"
+        grid
+        index-as-key
+        :class="useResponsiveClasses('card-grid-container')">
         <ItemCard
           :item="item"
+          link
           margin
           text
-          overlay
-          link />
-      </template>
-    </div>
+          overlay />
+      </JVirtual>
+      <div
+        v-else
+        :class="useResponsiveClasses('card-grid-container')">
+        <template
+          v-for="item of items"
+          :key="item.Id">
+          <ItemCard
+            :item="item"
+            margin
+            text
+            overlay
+            link />
+        </template>
+      </div>
+    </template>
     <VRow
-      v-else-if="items.length === 0"
+      v-else
       justify="center">
       <VCol
         cols="12"
@@ -41,7 +44,7 @@
           text
           boilerplate />
       </VCol>
-      <div class="empty-message text-center">
+      <div class="text-center empty-message">
         <slot>
           <h1 class="text-h5">
             {{ $t('noResultsFound') }}
@@ -54,21 +57,16 @@
 
 <script setup lang="ts">
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client';
-import { useResponsiveClasses } from '@/composables/use-responsive-classes';
+import { useResponsiveClasses } from '#/composables/use-responsive-classes';
 
-withDefaults(
-  defineProps<{
-    items: BaseItemDto[];
-    large?: boolean;
-    noVirtual?: boolean;
-  }>(),
-  {
-    noVirtual: false
-  }
-);
+const { items, large, noVirtual } = defineProps<{
+  items: BaseItemDto[];
+  large?: boolean;
+  noVirtual?: boolean;
+}>();
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .empty-card-container {
   max-height: 90vh;
   overflow: hidden;

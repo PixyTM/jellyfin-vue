@@ -1,7 +1,7 @@
 <template>
   <VDialog
     max-width="30%"
-    :model-value="person !== undefined"
+    :model-value="!isNil(person)"
     @update:model-value="emit('close')">
     <VCard>
       <VCardTitle>{{ t('editPerson') }}</VCardTitle>
@@ -12,16 +12,16 @@
             <VAvatar
               size="160"
               class="ml-2">
-              <VImg
-                v-if="person?.Id && person?.PrimaryImageTag"
+              <JImg
                 :src="
-                  $remote.sdk.api?.getItemImageUrl(person.Id, ImageType.Primary)
-                " />
-              <VIcon
-                v-else
-                class="bg-grey-darken-3">
-                <IMdiAccount />
-              </VIcon>
+                  person?.Id && getItemImageUrl(person.Id, ImageType.Primary)
+                "
+                :alt="$t('person')">
+                <template #placeholder>
+                  <JIcon
+                    class="bg-grey-darken-3 i-mdi:account" />
+                </template>
+              </JImg>
             </VAvatar>
           </VCol>
           <VCol>
@@ -77,18 +77,20 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { useTranslation } from 'i18next-vue';
 import { type BaseItemPerson, ImageType } from '@jellyfin/sdk/lib/generated-client';
 import { watchImmediate } from '@vueuse/core';
+import { isNil } from '@jellyfin-vue/shared/validation';
+import { getItemImageUrl } from '#/utils/images';
 
-const props = defineProps<{ person: BaseItemPerson | undefined }>();
+const { person } = defineProps<{ person: BaseItemPerson | undefined }>();
 
 const emit = defineEmits<{
   'update:person': [person: BaseItemPerson];
-  close: [];
+  'close': [];
 }>();
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const editState = ref<BaseItemPerson>();
 const options = computed(() => [
@@ -101,8 +103,8 @@ const options = computed(() => [
 ]);
 
 watchImmediate(
-  () => props.person,
-  (person) => {
+  () => person,
+  () => {
     editState.value = { ...person };
   }
 );

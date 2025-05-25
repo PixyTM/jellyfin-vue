@@ -1,5 +1,8 @@
 <template>
-  <SettingsPage page-title="apiKeys">
+  <SettingsPage>
+    <template #title>
+      {{ t('apiKeys') }}
+    </template>
     <template #actions>
       <VBtn
         color="primary"
@@ -9,7 +12,7 @@
         {{ t('addNewKey') }}
       </VBtn>
       <VBtn
-        v-if="apiKeys.length > 0"
+        v-if="apiKeys.length"
         color="error"
         variant="elevated"
         :loading="loading"
@@ -73,7 +76,7 @@
         " />
       <VDialog
         width="auto"
-        :model-value="confirmRevoke !== undefined"
+        :model-value="!isNil(confirmRevoke)"
         @update:model-value="confirmRevoke = undefined">
         <VCard>
           <VCardText>
@@ -108,12 +111,13 @@ import type { AuthenticationInfo } from '@jellyfin/sdk/lib/generated-client';
 import { getApiKeyApi } from '@jellyfin/sdk/lib/utils/api/api-key-api';
 import { formatRelative, parseJSON } from 'date-fns';
 import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { remote } from '@/plugins/remote';
-import { useSnackbar } from '@/composables/use-snackbar';
-import { useDateFns } from '@/composables/use-datefns';
+import { useTranslation } from 'i18next-vue';
+import { isNil } from '@jellyfin-vue/shared/validation';
+import { remote } from '#/plugins/remote';
+import { useSnackbar } from '#/composables/use-snackbar';
+import { useDateFns } from '#/composables/use-datefns';
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const apiKeys = ref<AuthenticationInfo[]>([]);
 const addingNewKey = ref(false);
@@ -195,8 +199,8 @@ async function revokeAllApiKeys(): Promise<void> {
  */
 async function refreshApiKeys(): Promise<void> {
   try {
-    apiKeys.value =
-      (await remote.sdk.newUserApi(getApiKeyApi).getKeys()).data.Items ?? [];
+    apiKeys.value
+      = (await remote.sdk.newUserApi(getApiKeyApi).getKeys()).data.Items ?? [];
   } catch (error) {
     apiKeys.value = [];
     console.error(error);

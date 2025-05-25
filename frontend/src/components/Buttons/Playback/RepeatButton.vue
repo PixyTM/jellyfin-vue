@@ -1,26 +1,15 @@
 <template>
   <VBtn
+    v-bind="$attrs"
     icon
-    :size="size"
-    :color="playbackManager.isRepeating ? 'primary' : undefined"
-    @click="playbackManager.toggleRepeatMode">
-    <VIcon
-      :size="size"
-      :icon="repeatIcon" />
+    :color="playbackManager.isRepeating.value ? 'primary' : undefined"
+    @click.passive="playbackManager.toggleRepeatMode">
+    <JIcon
+      v-bind="$attrs"
+      :class="playbackManager.repeatMode.value === RepeatMode.RepeatOne ? 'i-mdi:repeat-once' : 'i-mdi:repeat'" />
   </VBtn>
 </template>
 
 <script setup lang="ts">
-import IMdiRepeat from 'virtual:icons/mdi/repeat';
-import IMdiRepeatOnce from 'virtual:icons/mdi/repeat-once';
-import { computed } from 'vue';
-import { RepeatMode, playbackManager } from '@/store/playback-manager';
-
-defineProps<{ size?: string }>();
-
-const repeatIcon = computed(() =>
-  playbackManager.repeatMode === RepeatMode.RepeatOne
-    ? IMdiRepeatOnce
-    : IMdiRepeat
-);
+import { RepeatMode, playbackManager } from '#/store/playback-manager';
 </script>

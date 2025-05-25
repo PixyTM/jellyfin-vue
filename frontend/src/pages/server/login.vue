@@ -4,7 +4,7 @@
     fluid>
     <VRow justify="center">
       <VCol
-        v-if="isEmpty(currentUser) && !loginAsOther && publicUsers.length > 0"
+        v-if="!currentUser && !loginAsOther && publicUsers.length"
         sm="10"
         md="7"
         lg="5">
@@ -57,15 +57,15 @@
       </VCol>
       <VCol
         v-else-if="
-          !isEmpty(currentUser) ||
+          currentUser ||
             loginAsOther ||
-            (publicUsers.length === 0 && $remote.auth.currentServer?.ServerName)
+            (publicUsers.length === 0 && $remote.auth.currentServer.value?.ServerName)
         "
         sm="6"
         md="6"
         lg="5">
         <h1
-          v-if="!isEmpty(currentUser)"
+          v-if="currentUser"
           class="text-h4 mb-3 text-center">
           {{ $t('loginAs', { name: currentUser.Name }) }}
         </h1>
@@ -75,13 +75,16 @@
           {{ $t('login') }}
         </h1>
         <h5 class="text-center mb-3 text--disabled">
-          {{ $remote.auth.currentServer?.ServerName }}
+          {{ $remote.auth.currentServer.value?.ServerName }}
         </h5>
         <LoginForm
           :user="currentUser"
+          :disabled="!isConnectedToServer"
           @change="resetCurrentUser" />
-        <p class="text-p mt-6 text-center">
-          {{ disclaimer }}
+        <p
+          v-if="disclaimer"
+          class="mt-6 text-center text-p">
+          <JSafeHtml :html="disclaimer" />
         </p>
       </VCol>
     </VRow>
@@ -90,44 +93,29 @@
 
 <route lang="yaml">
 meta:
-  layout: server
+  layout:
+    name: server
 </route>
 
 <script setup lang="ts">
 import type { UserDto } from '@jellyfin/sdk/lib/generated-client';
-import { getBrandingApi } from '@jellyfin/sdk/lib/utils/api/branding-api';
-import { getSystemApi } from '@jellyfin/sdk/lib/utils/api/system-api';
-import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api';
-import { isEmpty } from 'lodash-es';
-import { ref, shallowRef } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router/auto';
-import { remote } from '@/plugins/remote';
-import { getJSONConfig } from '@/utils/external-config';
+import { ref, shallowRef, computed, watch } from 'vue';
+import { useTranslation } from 'i18next-vue';
+import { remote } from '#/plugins/remote';
+import { jsonConfig } from '#/utils/external-config';
+import { usePageTitle } from '#/composables/page-title';
+import { useSnackbar } from '#/composables/use-snackbar';
+import { isConnectedToServer } from '#/store';
 
-const jsonConfig = await getJSONConfig();
-const { t } = useI18n();
-const route = useRoute();
-const router = useRouter();
-const api = remote.sdk.oneTimeSetup(
-  remote.auth.currentServer?.PublicAddress ?? ''
-);
+const { t } = useTranslation();
 
-route.meta.title = t('login');
+usePageTitle(() => t('login'));
 
-try {
-  await getSystemApi(api).getPublicSystemInfo();
-} catch {
-  await router.replace('/server/select');
-}
-
-const brandingData = (await getBrandingApi(api).getBrandingOptions()).data;
-const publicUsers = (await getUserApi(api).getPublicUsers({})).data;
-
-const disclaimer = brandingData.LoginDisclaimer;
+const disclaimer = computed(() => remote.auth.currentServer.value?.BrandingOptions.LoginDisclaimer);
+const publicUsers = computed(() => remote.auth.currentServer.value?.PublicUsers ?? []);
 
 const loginAsOther = shallowRef(false);
-const currentUser = ref<UserDto>({});
+const currentUser = ref<UserDto>();
 
 /**
  * Sets the current user for public user login
@@ -136,7 +124,6 @@ async function setCurrentUser(user: UserDto): Promise<void> {
   if (!user.HasPassword && user.Name) {
     // If the user doesn't have a password, avoid showing the password form
     await remote.auth.loginUser(user.Name, '');
-    await router.replace('/');
   } else {
     currentUser.value = user;
   }
@@ -146,7 +133,13 @@ async function setCurrentUser(user: UserDto): Promise<void> {
  * Resets the currently selected user
  */
 function resetCurrentUser(): void {
-  currentUser.value = {};
+  currentUser.value = undefined;
   loginAsOther.value = false;
 }
+
+watch(isConnectedToServer, () => {
+  if (!isConnectedToServer.value) {
+    useSnackbar(t('noServerConnection'), 'error');
+  }
+});
 </script>

@@ -16,12 +16,12 @@
         icon
         :disabled="tabName === 'searchMenu'"
         @click="clear">
-        <IMdiArrowLeft />
+        <JIcon class="i-mdi:arrow-left" />
       </VBtn>
     </template>
 
     <VCardText
-      class="pa-0 px-2 flex-grow-1"
+      class="pa-0 flex-grow-1 px-2"
       :class="{
         'd-flex': !$vuetify.display.mobile,
         'flex-row': !$vuetify.display.mobile
@@ -47,13 +47,13 @@
         </VWindowItem>
         <VWindowItem value="resultsMenu">
           <h3>{{ $t('results') }}</h3>
-          <div class="mt-2 text-subtitle-1">
+          <div class="text-subtitle-1 mt-2">
             {{ $t('identifyInstructResult') }}
           </div>
           <VCheckbox
             v-if="searchResults"
             v-model="replaceImage"
-            class="d-flex mt-2"
+            class="mt-2 d-flex"
             color="primary">
             <template #append>
               {{ $t('replaceExistingImages') }}
@@ -61,7 +61,7 @@
           </VCheckbox>
           <VDivider />
           <IdentifyResults
-            v-if="isArray(searchResults) && searchResults.length > 0"
+            v-if="isArray(searchResults) && searchResults.length"
             :items="searchResults"
             :item-type="item.Type"
             @select="applySelectedSearch" />
@@ -95,11 +95,11 @@ import type {
 } from '@jellyfin/sdk/lib/generated-client';
 import { getItemLookupApi } from '@jellyfin/sdk/lib/utils/api/item-lookup-api';
 import { computed, ref, shallowRef, toRaw } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useConfirmDialog } from '@/composables/use-confirm-dialog';
-import { useSnackbar } from '@/composables/use-snackbar';
-import { remote } from '@/plugins/remote';
-import { isArray, isStr } from '@/utils/validation';
+import { useTranslation } from 'i18next-vue';
+import { isArray, isNil, isStr } from '@jellyfin-vue/shared/validation';
+import { useConfirmDialog } from '#/composables/use-confirm-dialog';
+import { useSnackbar } from '#/composables/use-snackbar';
+import { remote } from '#/plugins/remote';
 
 interface IdentifyField {
   key: string;
@@ -108,7 +108,7 @@ interface IdentifyField {
   value?: string | null;
 }
 
-const props = defineProps<{ item: BaseItemDto }>();
+const { item } = defineProps<{ item: BaseItemDto }>();
 
 const emit = defineEmits<{
   close: [];
@@ -117,16 +117,16 @@ const emit = defineEmits<{
 /**
  * Closes the dialog and kills the DOM element.
  */
-function close (): void {
+function close(): void {
   model.value = false;
   emit('close');
 }
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const availableProviders = (
   await remote.sdk.newUserApi(getItemLookupApi).getExternalIdInfos({
-    itemId: props.item.Id ?? ''
+    itemId: item.Id ?? ''
   })
 ).data;
 
@@ -141,27 +141,27 @@ const searchFields = computed<IdentifyField[]>(() => {
       key: 'search-name',
       title: t('name'),
       type: 'string',
-      value: props.item.Name ?? ''
+      value: item.Name ?? ''
     }
   ];
 
-  if (!['BoxSet', 'Person'].includes(props.item.Type || '')) {
+  if (!['BoxSet', 'Person'].includes(item.Type ?? '')) {
     result.push({
       key: 'search-year',
       title: t('year'),
       type: 'number',
-      value: props.item.ProductionYear ? String(props.item.ProductionYear) : ''
+      value: item.ProductionYear ? String(item.ProductionYear) : ''
     });
   }
 
   /**
    * Providers that the item already has
    */
-  if (props.item.ProviderIds) {
-    for (const key in props.item.ProviderIds) {
+  if (item.ProviderIds) {
+    for (const key in item.ProviderIds) {
       result.push({
         key,
-        value: props.item.ProviderIds[key],
+        value: item.ProviderIds[key],
         title: `${key} ID`,
         type: 'string'
       });
@@ -171,11 +171,11 @@ const searchFields = computed<IdentifyField[]>(() => {
   /**
    * Providers available for the item type, but not assigned to it
    */
-  const populatedKeys = Object.keys(props.item.ProviderIds ?? {});
+  const populatedKeys = Object.keys(item.ProviderIds ?? {});
   const missingProviders = availableProviders
-    .filter((p) => !populatedKeys.includes(p.Key ?? ''))
-    .map((p) => p.Key)
-    .filter((p): p is string => p !== undefined);
+    .filter(p => !populatedKeys.includes(p.Key ?? ''))
+    .map(p => p.Key)
+    .filter((p): p is string => !isNil(p));
 
   for (const key of missingProviders) {
     result.push({
@@ -188,11 +188,14 @@ const searchFields = computed<IdentifyField[]>(() => {
 
   return result;
 });
+/**
+ * TODO: Refactor to remove this use of structuredClone
+ */
 const fieldsInputs = ref<IdentifyField[]>(
   structuredClone(toRaw(searchFields.value))
 );
 const tabName = computed(() =>
-  searchResults.value === undefined ? 'searchMenu' : 'resultsMenu'
+  isNil(searchResults.value) ? 'searchMenu' : 'resultsMenu'
 );
 const progress = computed(() => {
   switch (tabName.value) {
@@ -207,13 +210,7 @@ const progress = computed(() => {
     }
   }
 });
-const itemPath = computed<string | undefined>(() => {
-  if (!props.item) {
-    return;
-  }
-
-  return props.item.Path ?? undefined;
-});
+const itemPath = computed<string | undefined>(() => item.Path ?? undefined);
 
 /**
  * Get the remote search results for an item and search params.
@@ -229,13 +226,13 @@ async function getItemRemoteSearch(
   interface Query {
     Name?: string;
     Year?: number;
-    ProviderIds: { [key: string]: string };
+    ProviderIds: Record<string, string>;
   }
 
   const searcher = remote.sdk.newUserApi(getItemLookupApi);
   const itemId = item.Id;
 
-  if (itemId === undefined) {
+  if (isNil(itemId)) {
     return;
   }
 
@@ -256,8 +253,8 @@ async function getItemRemoteSearch(
    * These provider IDs are basically directly use to pull information from said provider.
    */
   for (const field of fields) {
-    const value =
-      isStr(field.value) ? field.value.trim() : field.value;
+    const value
+      = isStr(field.value) ? field.value.trim() : field.value;
 
     if (field.key === 'search-name' && value) {
       searchQuery.Name = value;
@@ -369,7 +366,7 @@ async function performSearch(): Promise<void> {
   isLoading.value = true;
 
   try {
-    const results = await getItemRemoteSearch(props.item, fieldsInputs.value);
+    const results = await getItemRemoteSearch(item, fieldsInputs.value);
 
     searchResults.value = isArray(results) ? results : [];
   } catch (error) {
@@ -391,7 +388,7 @@ async function applySelectedSearch(result: RemoteSearchResult): Promise<void> {
 
       try {
         await remote.sdk.newUserApi(getItemLookupApi).applySearchCriteria({
-          itemId: props.item.Id ?? '',
+          itemId: item.Id ?? '',
           remoteSearchResult: result,
           replaceAllImages: replaceImage.value
         });
@@ -407,7 +404,7 @@ async function applySelectedSearch(result: RemoteSearchResult): Promise<void> {
     {
       title: '',
       text: t('identifyConfirmChanges', {
-        originalItem: props.item.Name,
+        originalItem: item.Name,
         newIdentifiedItem: result.Name
       }),
       confirmText: t('confirm')

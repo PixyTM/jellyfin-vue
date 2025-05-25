@@ -1,5 +1,5 @@
 /**
- * @deprecated - Check @/utils/playback-profiles/index
+ * @deprecated - Check #/utils/playback-profiles/index
  */
 
 import { hasH264Support, hasHevcSupport } from './mp4-video-formats';
@@ -10,7 +10,7 @@ import {
   isFirefox,
   isTizen,
   isWebOS
-} from '@/utils/browser-detection';
+} from '#/utils/browser-detection';
 
 /**
  * Gets an array of supported fmp4 video codecs
@@ -24,20 +24,20 @@ export function getSupportedFmp4VideoCodecs(
   const codecs = [];
 
   if (
-    (isApple() || isEdge() || isTizen() || isWebOS()) &&
-    hasHevcSupport(videoTestElement)
+    (isApple() || isEdge() || isTizen() || isWebOS())
+    && hasHevcSupport(videoTestElement)
   ) {
     codecs.push('hevc');
   }
 
   if (
-    hasH264Support(videoTestElement) &&
-    (isChrome() ||
-    isFirefox() ||
-    isApple() ||
-    isEdge() ||
-    isTizen() ||
-    isWebOS())
+    hasH264Support(videoTestElement)
+    && (isChrome()
+      || isFirefox()
+      || isApple()
+      || isEdge()
+      || isTizen()
+      || isWebOS())
   ) {
     codecs.push('h264');
   }

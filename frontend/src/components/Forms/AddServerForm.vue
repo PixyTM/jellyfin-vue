@@ -22,7 +22,7 @@
             block
             size="large"
             variant="elevated"
-            @click="router.push('/server/select')">
+            @click.prevent="router.push('/server/select')">
             {{ $t('changeServer') }}
           </VBtn>
         </VCol>
@@ -44,36 +44,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, unref } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router/auto';
-import { remote } from '@/plugins/remote';
-import { getJSONConfig } from '@/utils/external-config';
+import { shallowRef } from 'vue';
+import { useTranslation } from 'i18next-vue';
+import { useRouter } from 'vue-router';
+import { remote } from '#/plugins/remote';
+import { jsonConfig } from '#/utils/external-config';
 
-const jsonConfig = await getJSONConfig();
 const router = useRouter();
-const i18n = useI18n();
-const valid = ref(false);
-const previousServerLength = unref(remote.auth.servers.length);
-const serverUrl = ref('');
-const loading = ref(false);
+const { t } = useTranslation();
+const valid = shallowRef(false);
+const previousServerLength = remote.auth.addedServers.value;
+const serverUrl = shallowRef('');
+const loading = shallowRef(false);
 
 const rules = [
-  (v: string): boolean | string => !!v.trim() || i18n.t('required')
+  (v: string): boolean | string => !!v.trim() || t('required')
 ];
 
 /**
- * Attempts a connection to the given server
+ * Attempts a connection to the given server.
+ * If the connection is successful, the user will be redirected to the login page
+ * at the middleware level
  */
 async function connectToServer(): Promise<void> {
   loading.value = true;
 
   try {
     await remote.auth.connectServer(serverUrl.value);
-
-    await (previousServerLength === 0
-      ? router.push('/server/login')
-      : router.push('/server/select'));
+    await router.push('/server/login');
   } finally {
     loading.value = false;
   }

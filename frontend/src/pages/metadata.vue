@@ -26,18 +26,17 @@
 import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
 import { ref } from 'vue';
-import { remote } from '@/plugins/remote';
+import { remote } from '#/plugins/remote';
 
-type ITreeNode = {
+interface ITreeNode {
   id: string;
   name: string | null | undefined;
   children?: ITreeNode[];
-};
-
+}
 
 const initialItems = (
-  (await remote.sdk.newUserApi(getLibraryApi).getMediaFolders()).data.Items ??
-  []
+  (await remote.sdk.newUserApi(getLibraryApi).getMediaFolders()).data.Items
+  ?? []
 ).map((dir) => {
   if (!dir.Id) {
     throw new Error('received item without id');
@@ -61,10 +60,10 @@ async function fetchChildItems(node: ITreeNode): Promise<void> {
     throw new Error('expanding a node without children');
   }
 
-  const libraryItems =
-    (
-      await remote.sdk.newUserApi(getItemsApi).getItemsByUserId({
-        userId: remote.auth.currentUserId ?? '',
+  const libraryItems
+    = (
+      await remote.sdk.newUserApi(getItemsApi).getItems({
+        userId: remote.auth.currentUserId.value,
         parentId: node.id,
         sortBy: ['SortName']
       })
@@ -95,7 +94,7 @@ function onExpandItems(ids: string[]): void {
   itemId.value = ids[0];
 }
 </script>
-<style lang="scss" scoped>
+<style scoped>
 .metadata {
   height: calc(100vh - 64px);
   overflow: hidden;

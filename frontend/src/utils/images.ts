@@ -6,10 +6,15 @@ import {
   type BaseItemDto,
   BaseItemKind,
   type BaseItemPerson,
-  ImageType
+  ImageType,
+  type UserDto
 } from '@jellyfin/sdk/lib/generated-client';
-import { remote } from '@/plugins/remote';
-import { CardShapes, getShapeFromItemType, isPerson } from '@/utils/items';
+import { getImageApi } from '@jellyfin/sdk/lib/utils/api/image-api';
+import type { ImageUrlsApi } from '@jellyfin/sdk/lib/utils/api/image-urls-api';
+import type { ImageRequestParameters } from '@jellyfin/sdk/lib/models/api/image-request-parameters';
+import { isNil } from '@jellyfin-vue/shared/validation';
+import { remote } from '#/plugins/remote';
+import { CardShapes, getShapeFromItemType, isPerson } from '#/utils/items';
 
 export interface ImageUrlInfo {
   url?: string;
@@ -19,6 +24,63 @@ export interface ImageUrlInfo {
 const excludedBlurhashTypes = Object.freeze(
   new Set<ImageType>([ImageType.Logo])
 );
+
+const imageDefaultOptions = (): ImageRequestParameters => ({ format: 'Webp' });
+
+/**
+ * Gets the image URL given an item id and the image type requested
+ */
+export function getItemImageUrl(...args: Parameters<ImageUrlsApi['getItemImageUrlById']>) {
+  const argsLen = args.length;
+
+  switch (argsLen) {
+    case 1: {
+      args.push(undefined, imageDefaultOptions());
+      break;
+    }
+    case 2: {
+      args.push(imageDefaultOptions());
+      break;
+    }
+    case 3: {
+      args[2] = { ...args[2], ...imageDefaultOptions() };
+      break;
+    }
+  }
+
+  return remote.sdk.newUserApi(getImageApi).getItemImageUrlById(...args);
+}
+
+/**
+ * Gets the logged's user image URL
+ */
+export function getUserImageUrl(user?: UserDto) {
+  return remote.sdk.newUserApi(getImageApi).getUserImageUrl(user, imageDefaultOptions());
+}
+
+/**
+ * Gets the image url with the desired size and quality.
+ */
+function getImageUrlWithSize(
+  itemId: string,
+  { width,
+    height,
+    quality,
+    ratio = 1
+  }: {
+    width?: number;
+    height?: number;
+    quality?: number;
+    ratio?: number;
+  } = {},
+  imgType?: ImageType
+) {
+  return getItemImageUrl(itemId, imgType, {
+    quality,
+    maxWidth: isNil(width) ? undefined : Math.round(width * ratio),
+    maxHeight: isNil(height) ? undefined : Math.round(height * ratio)
+  });
+};
 
 /**
  * Gets the tag of the image of an specific item and type.
@@ -42,7 +104,7 @@ export function getImageTag(
   }
 
   if (item.ImageTags?.[type]) {
-    return item.ImageTags?.[type];
+    return item.ImageTags[type];
   } else if (type === ImageType.Backdrop && item.BackdropImageTags?.[index]) {
     return item.BackdropImageTags[index];
   }
@@ -51,10 +113,10 @@ export function getImageTag(
     switch (type) {
       case ImageType.Primary: {
         return (
-          item.AlbumPrimaryImageTag ||
-          item.ChannelPrimaryImageTag ||
-          item.ParentPrimaryImageTag ||
-          undefined
+          item.AlbumPrimaryImageTag
+          ?? item.ChannelPrimaryImageTag
+          ?? item.ParentPrimaryImageTag
+          ?? undefined
         );
       }
       case ImageType.Art: {
@@ -118,30 +180,15 @@ export function getBlurhash(
   index = 0,
   checkParent = true
 ): string | undefined {
-  if (item) {
-    const tag = getImageTag(item, type, index, checkParent);
+  const tag = getImageTag(item, type, index, checkParent);
 
-    if (
-      tag &&
-      !excludedBlurhashTypes.has(type) &&
-      item.ImageBlurHashes?.[type]?.[tag]
-    ) {
-      return item.ImageBlurHashes?.[type]?.[tag];
-    }
+  if (
+    tag
+    && !excludedBlurhashTypes.has(type)
+    && item.ImageBlurHashes?.[type]?.[tag]
+  ) {
+    return item.ImageBlurHashes[type][tag];
   }
-}
-
-/**
- * Returns the aspect ratio that should be use
- */
-export function getContainerAspectRatioForImageType(
-  imageType?: ImageType
-): number {
-  if (imageType === ImageType.Backdrop) {
-    return 1.777_777_778;
-  }
-
-  return 0.666_666_667;
 }
 
 /**
@@ -220,7 +267,6 @@ export function getImageInfo(
   } = {}
 ): ImageUrlInfo {
   // TODO: Refactor to have separate getPosterImageInfo, getThumbImageInfo and getBackdropImageInfo.
-  let url;
   let imgType;
   let imgTag;
   let itemId: string | null | undefined = item.Id;
@@ -248,9 +294,8 @@ export function getImageInfo(
     imgType = ImageType.Thumb;
     imgTag = item.ImageTags.Thumb;
   } else if (
-    (preferBanner || shape === CardShapes.Banner) &&
-    item.ImageTags &&
-    item.ImageTags.Banner
+    (preferBanner || shape === CardShapes.Banner)
+    && item.ImageTags?.Banner
   ) {
     imgType = ImageType.Banner;
     imgTag = item.ImageTags.Banner;
@@ -265,9 +310,9 @@ export function getImageInfo(
     imgTag = item.ParentLogoImageTag;
     itemId = item.ParentLogoItemId;
   } else if (
-    preferBackdrop &&
-    item.ParentBackdropImageTags?.[0] &&
-    item.ParentBackdropItemId
+    preferBackdrop
+    && item.ParentBackdropImageTags?.[0]
+    && item.ParentBackdropItemId
   ) {
     imgType = ImageType.Backdrop;
     imgTag = item.ParentBackdropImageTags[0];
@@ -277,27 +322,25 @@ export function getImageInfo(
     imgTag = item.SeriesThumbImageTag;
     itemId = item.SeriesId;
   } else if (
-    preferThumb &&
-    item.ParentThumbItemId &&
-    inheritThumb &&
-    item.MediaType !== 'Photo'
+    preferThumb
+    && item.ParentThumbItemId
+    && inheritThumb
+    && item.MediaType !== 'Photo'
   ) {
     imgType = ImageType.Thumb;
     imgTag = item.ParentThumbImageTag;
     itemId = item.ParentThumbItemId;
   } else if (
-    preferThumb &&
-    item.BackdropImageTags &&
-    item.BackdropImageTags.length > 0
+    preferThumb
+    && item.BackdropImageTags?.length
   ) {
     imgType = ImageType.Backdrop;
     imgTag = item.BackdropImageTags[0];
   } else if (
-    preferThumb &&
-    item.ParentBackdropImageTags &&
-    item.ParentBackdropImageTags.length > 0 &&
-    inheritThumb &&
-    item.Type === BaseItemKind.Episode
+    preferThumb
+    && item.ParentBackdropImageTags?.length
+    && inheritThumb
+    && item.Type === BaseItemKind.Episode
   ) {
     imgType = ImageType.Backdrop;
     imgTag = item.ParentBackdropImageTags[0];
@@ -305,8 +348,8 @@ export function getImageInfo(
   } else if (item.ImageTags?.Primary && (item.Type !== BaseItemKind.Episode || item.ChildCount !== 0)) {
     imgType = ImageType.Primary;
     imgTag = item.ImageTags.Primary;
-    height =
-      width && item.PrimaryImageAspectRatio
+    height
+      = width && item.PrimaryImageAspectRatio
         ? Math.round(width / item.PrimaryImageAspectRatio)
         : undefined;
   } else if (item.SeriesPrimaryImageTag) {
@@ -321,34 +364,33 @@ export function getImageInfo(
     imgType = ImageType.Primary;
     imgTag = item.AlbumPrimaryImageTag;
     itemId = item.AlbumId;
-    height =
-      width && item.PrimaryImageAspectRatio
+    height
+      = width && item.PrimaryImageAspectRatio
         ? Math.round(width / item.PrimaryImageAspectRatio)
         : undefined;
   } else if (
-    item.Type === BaseItemKind.Season &&
-    item.ImageTags?.Thumb
+    item.Type === BaseItemKind.Season
+    && item.ImageTags?.Thumb
   ) {
     imgType = ImageType.Thumb;
     imgTag = item.ImageTags.Thumb;
-  } else if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
+  } else if (item.BackdropImageTags?.length) {
     imgType = ImageType.Backdrop;
     imgTag = item.BackdropImageTags[0];
   } else if (item.ImageTags?.Thumb) {
     imgType = ImageType.Thumb;
     imgTag = item.ImageTags.Thumb;
-  } else if (item.SeriesThumbImageTag && inheritThumb !== false) {
+  } else if (item.SeriesThumbImageTag && inheritThumb) {
     imgType = ImageType.Thumb;
     imgTag = item.SeriesThumbImageTag;
     itemId = item.SeriesId;
-  } else if (item.ParentThumbItemId && inheritThumb !== false) {
+  } else if (item.ParentThumbItemId && inheritThumb) {
     imgType = ImageType.Thumb;
     imgTag = item.ParentThumbImageTag;
     itemId = item.ParentThumbItemId;
   } else if (
-    item.ParentBackdropImageTags &&
-    item.ParentBackdropImageTags.length > 0 &&
-    inheritThumb !== false
+    item.ParentBackdropImageTags?.length
+    && inheritThumb
   ) {
     imgType = ImageType.Backdrop;
     imgTag = item.ParentBackdropImageTags[0];
@@ -366,31 +408,13 @@ export function getImageInfo(
     };
   }
 
-  const url_string = remote.sdk.api?.getItemImageUrl(itemId, imgType);
-
-  if (imgTag && imgType && url_string) {
-    url = new URL(url_string);
-
-    const parameters: Record<string, string> = {
-      imgTag,
-      quality: quality.toString()
-    };
-
-    if (width) {
-      width = Math.round(width * ratio);
-      parameters.maxWidth = width.toString();
-    }
-
-    if (height) {
-      height = Math.round(height * ratio);
-      parameters.maxHeight = height.toString();
-    }
-
-    url.search = new URLSearchParams(parameters).toString();
-  }
-
   return {
-    url: url?.href,
+    url: getImageUrlWithSize(itemId, {
+      width,
+      height,
+      quality,
+      ratio
+    }, imgType),
     blurhash:
       imgType && imgTag ? item.ImageBlurHashes?.[imgType]?.[imgTag] : undefined
   };
@@ -421,42 +445,28 @@ export function getLogo(
     tag?: string;
   } = {}
 ): ImageUrlInfo {
-  let url;
-  let imgType;
+  const imgType = ImageType.Logo;
   let imgTag;
   let itemId: string | null | undefined = item.Id;
 
   if (tag) {
-    imgType = ImageType.Logo;
     imgTag = tag;
   } else if (item.ImageTags?.Logo) {
-    imgType = ImageType.Logo;
     imgTag = item.ImageTags.Logo;
   } else if (item.ParentLogoImageTag && item.ParentLogoItemId) {
-    imgType = ImageType.Logo;
     imgTag = item.ParentLogoImageTag;
     itemId = item.ParentLogoItemId;
   }
 
-  if (imgTag && imgType && itemId) {
-    url = new URL(remote.sdk.api?.getItemImageUrl(itemId, imgType) ?? '');
-
-    const parameters: Record<string, string> = {
-      imgTag,
-      quality: quality.toString()
-    };
-
-    if (width) {
-      width = Math.round(width * ratio);
-      parameters.maxWidth = width.toString();
-    }
-
-    url.search = new URLSearchParams(parameters).toString();
-  }
-
   return {
-    url: url?.href,
+    url: isNil(imgTag)
+      ? undefined
+      : getImageUrlWithSize(itemId ?? '', {
+          width,
+          quality,
+          ratio
+        }, imgType),
     blurhash:
-      imgType && imgTag ? item.ImageBlurHashes?.[imgType]?.[imgTag] : undefined
+      imgTag ? item.ImageBlurHashes?.[imgType]?.[imgTag] : undefined
   };
 }

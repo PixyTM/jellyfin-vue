@@ -1,3 +1,6 @@
+import { isStr } from '@jellyfin-vue/shared/validation';
+import { capitalize } from 'vue';
+
 /**
  * Given a locale code, return the language name of another locale
  */
@@ -7,7 +10,7 @@ export function getLocaleName(
 ): string | undefined {
   const r = new Intl.DisplayNames([toCode], { type: 'language' }).of(fromCode);
 
-  return r ? r.charAt(0).toUpperCase() + r.slice(1) : undefined;
+  return isStr(r) ? capitalize(r) : r;
 }
 
 /**

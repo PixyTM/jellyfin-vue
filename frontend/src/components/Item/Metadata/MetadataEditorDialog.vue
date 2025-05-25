@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-defineProps<{ itemId: string }>();
+const { itemId } = defineProps<{ itemId: string }>();
 
 const emit = defineEmits<{
   close: [];
@@ -24,7 +24,7 @@ const model = ref(true);
 
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .metadata-dialog {
   height: 60vh;
 }

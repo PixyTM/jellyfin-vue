@@ -9,18 +9,11 @@
         margin
         @click="$emit('select', item)">
         <template #image>
-          <JImg :src="item.ImageUrl">
-            <template #loading>
-              <VProgressCircular indeterminate />
-            </template>
-            <template #error>
-              <VIcon>
-                <IMdiImageBrokenVariant />
-              </VIcon>
-            </template>
-            <VIcon>
-              <IMdiImage />
-            </VIcon>
+          <JImg
+            :src="item.ImageUrl"
+            :alt="item.Name ?? $t('imageSearchResult')"
+            once>
+            <JIcon class="i-mdi:image" />
           </JImg>
         </template>
         <template #title>
@@ -40,9 +33,9 @@ import type {
   RemoteSearchResult
 } from '@jellyfin/sdk/lib/generated-client';
 import { computed } from 'vue';
-import { getShapeFromItemType } from '@/utils/items';
+import { getShapeFromItemType } from '#/utils/items';
 
-const props = defineProps<{
+const { items, itemType } = defineProps<{
   items: RemoteSearchResult[];
   itemType?: BaseItemKind;
 }>();
@@ -51,7 +44,7 @@ defineEmits<{
   select: [item: RemoteSearchResult];
 }>();
 
-const shape = computed(() => getShapeFromItemType(props.itemType));
+const shape = computed(() => getShapeFromItemType(itemType));
 
 /**
  * Generate card's subtitles
@@ -60,8 +53,8 @@ function getSubtitle(item: RemoteSearchResult): string | undefined {
   const yearString = item.ProductionYear
     ? String(item.ProductionYear)
     : undefined;
-  const value =
-    yearString && item.SearchProviderName
+  const value
+    = yearString && item.SearchProviderName
       ? `${yearString} - ${item.SearchProviderName}`
       : yearString ?? item.SearchProviderName;
 

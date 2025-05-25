@@ -2,8 +2,8 @@
   <VSelect
     v-model="currentSource"
     :items="selectSources"
-    :label="selectProps.label"
-    :single-line="selectProps.label == undefined"
+    :label="label"
+    :single-line="isNil(label)"
     hide-details
     class="text-truncate">
     <template #selection="{ item: i }">
@@ -20,9 +20,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { MediaSourceInfo } from '@jellyfin/sdk/lib/generated-client';
-import { getItemizedSelect } from '@/utils/forms';
+import { isNil } from '@jellyfin-vue/shared/validation';
+import { getItemizedSelect } from '#/utils/forms';
 
-const selectProps = defineProps<{
+const { sources, defaultSourceIndex, label } = defineProps<{
   sources: MediaSourceInfo[];
   defaultSourceIndex?: number;
   label?: string;
@@ -33,13 +34,13 @@ const emit = defineEmits<{
 }>();
 
 const currentSource = ref(
-  selectProps.sources[selectProps.defaultSourceIndex ?? 0]
+  sources[defaultSourceIndex ?? 0]
 );
-const selectSources = computed(() => getItemizedSelect(selectProps.sources));
+const selectSources = computed(() => getItemizedSelect(sources));
 
 watch(currentSource, () => {
-  const newIndex = selectProps.sources.findIndex(
-    (s) => s.Id === currentSource.value.Id
+  const newIndex = sources.findIndex(
+    s => s.Id === currentSource.value.Id
   );
 
   emit('input', newIndex);

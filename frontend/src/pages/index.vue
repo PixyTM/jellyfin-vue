@@ -1,10 +1,9 @@
 <template>
   <div>
     <ItemsCarousel
-      v-if="carousel.length > 0"
+      v-if="carousel.length"
       :items="carousel"
-      page-backdrop
-      class="top-carousel">
+      page-backdrop>
       <template #referenceText>
         {{ $t('recentlyAdded') }}
       </template>
@@ -31,13 +30,19 @@ const excludeViewTypes = new Set([
 ]);
 </script>
 
+<route lang="yaml">
+meta:
+  layout:
+    transparent: true
+</route>
+
 <script setup lang="ts">
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client';
 import { computed } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router/auto';
-import { isNil } from '@/utils/validation';
-import { CardShapes, fetchIndexPage, getShapeFromCollectionType } from '@/utils/items';
+import { useTranslation } from 'i18next-vue';
+import { isNil } from '@jellyfin-vue/shared/validation';
+import { CardShapes, fetchIndexPage, getShapeFromCollectionType } from '#/utils/items';
+import { usePageTitle } from '#/composables/page-title';
 
 interface HomeSection {
   title: string;
@@ -46,19 +51,17 @@ interface HomeSection {
   type: 'libraries' | 'resumevideo' | 'nextup' | 'latestmedia';
 }
 
-const { t } = useI18n();
-const route = useRoute();
+const { t } = useTranslation();
 
-route.meta.title = t('home');
-route.meta.transparentLayout = true;
+usePageTitle(() => t('home'));
 
 const { carousel, nextUp, views, resumeVideo, latestPerLibrary } = await fetchIndexPage();
 
 const latestMediaSections = computed(() => {
   return views.value.map((userView) => {
     if (
-      userView.CollectionType &&
-      !excludeViewTypes.has(userView.CollectionType)
+      userView.CollectionType
+      && !excludeViewTypes.has(userView.CollectionType)
     ) {
       return {
         title: t('latestLibrary', { libraryName: userView.Name }),
@@ -130,7 +133,7 @@ function getHomeSectionContent(section: HomeSection): BaseItemDto[] {
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .sections-after-header {
   position: relative;
   z-index: 4;

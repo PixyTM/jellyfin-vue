@@ -1,17 +1,15 @@
 <template>
   <VBtn
+    v-bind="$attrs"
     icon
-    :size="props.size"
-    :disabled="!playbackManager.nextItem"
+    :disabled="!playbackManager.nextItem.value"
     @click="playbackManager.setNextItem">
-    <VIcon :size="size">
-      <IMdiSkipNext />
-    </VIcon>
+    <JIcon
+      v-bind="$attrs"
+      class="i-mdi:skip-next" />
   </VBtn>
 </template>
 
 <script setup lang="ts">
-import { playbackManager } from '@/store/playback-manager';
-
-const props = defineProps<{ size?: string }>();
+import { playbackManager } from '#/store/playback-manager';
 </script>

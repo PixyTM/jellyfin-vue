@@ -16,11 +16,10 @@
       </VCardSubtitle>
 
       <VDivider />
-      <!-- eslint-disable vue/no-v-html vue/no-v-text-v-html-on-component -->
       <VCardText
-        class="d-flex text-center align-center justify-center"
-        v-html="sanitizeHtml(innerHtml)" />
-      <!-- eslint-enable vue/no-v-html vue/no-v-text-v-html-on-component -->
+        class="text-center d-flex align-center justify-center">
+        <JSafeHtml :html="state.text" />
+      </VCardText>
       <VCardActions class="align-center justify-center">
         <VBtn
           variant="elevated"
@@ -34,7 +33,7 @@
           variant="elevated"
           :color="state.confirmColor ?? 'error'"
           @click="confirm">
-          {{ state.confirmText }}
+          {{ state.confirmText ?? t('accept') }}
         </VBtn>
       </VCardActions>
     </VCard>
@@ -43,9 +42,8 @@
 
 <script lang="ts">
 import { reactive, computed } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { useTranslation } from 'i18next-vue';
 import { useConfirmDialog as vUseConfirmDialog } from '@vueuse/core';
-import { sanitizeHtml } from '@/utils/html';
 
 interface ConfirmDialogState {
   title: string;
@@ -69,7 +67,7 @@ const model = computed({
     return isRevealed.value;
   },
   set(newVal) {
-    if (newVal === false) {
+    if (!newVal) {
       cancel();
     }
   }
@@ -90,10 +88,10 @@ export async function useConfirmDialog<T>(
   func: () => T | Promise<T>,
   params: ConfirmDialogState,
   raiseError = false
-): Promise<T | void> {
-  state.title = params.title || '';
+): Promise<T | undefined> {
+  state.title = params.title;
+  state.text = params.text;
   state.subtitle = params.subtitle;
-  state.text = params.text || '';
   state.confirmText = params.confirmText;
   state.confirmColor = params.confirmColor;
 
@@ -110,7 +108,5 @@ export async function useConfirmDialog<T>(
 </script>
 
 <script setup lang="ts">
-const { t } = useI18n();
-
-const innerHtml = computed(() => state.text ?? t('accept'));
+const { t } = useTranslation();
 </script>

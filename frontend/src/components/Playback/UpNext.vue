@@ -1,7 +1,7 @@
 <template>
   <VContainer
-    v-if="visible && playbackManager.currentItem && playbackManager.nextItem"
-    class="up-next-dialog pointer-events-none pa-lg-6">
+    v-if="visible && playbackManager.currentItem.value && playbackManager.nextItem.value"
+    class="up-next-dialog pa-lg-6 uno-pointer-events-none">
     <VRow>
       <VCol
         cols="12"
@@ -11,39 +11,39 @@
         lg="4"
         offset-xl="9"
         xl="3">
-        <VCard class="pointer-events-all">
+        <VCard>
           <VCardTitle class="text-h6">
             <span>
               {{ $t('nextItemPlayingIn') }}
               <span class="text-primary darken-2">
-                {{ $tc('seconds', currentItemTimeLeft) }}
+                {{ $t('seconds', currentItemTimeLeft) }}
               </span>
             </span>
           </VCardTitle>
           <VCardSubtitle class="text-truncate text-subtitle-1">
-            <span v-if="playbackManager.currentItem.Type === 'Episode'">
-              {{ playbackManager.nextItem.SeriesName }} -
+            <span v-if="playbackManager.currentItem.value?.Type === 'Episode'">
+              {{ playbackManager.nextItem.value?.SeriesName }} -
               {{
                 $t('seasonEpisodeAbbrev', {
-                  seasonNumber: playbackManager.nextItem.ParentIndexNumber,
-                  episodeNumber: playbackManager.nextItem.IndexNumber
+                  seasonNumber: playbackManager.nextItem.value?.ParentIndexNumber,
+                  episodeNumber: playbackManager.nextItem.value?.IndexNumber
                 })
               }}
               <span v-if="$vuetify.display.smAndUp"> - </span>
-              <br v-else />
-              {{ playbackManager.nextItem.Name }}
+              <br v-else>
+              {{ playbackManager.nextItem.value?.Name }}
             </span>
-            <span v-if="playbackManager.currentItem.Type === 'Movie'">
-              {{ playbackManager.nextItem.Name }}
+            <span v-if="playbackManager.currentItem.value?.Type === 'Movie'">
+              {{ playbackManager.nextItem.value?.Name }}
             </span>
           </VCardSubtitle>
-          <VCardText v-if="playbackManager.nextItem?.RunTimeTicks">
+          <VCardText v-if="playbackManager.nextItem.value?.RunTimeTicks">
             <span>
-              {{ getRuntimeTime(playbackManager.nextItem.RunTimeTicks) }}
+              {{ getRuntimeTime(playbackManager.nextItem.value.RunTimeTicks) }}
               <span class="pl-4">
                 {{
                   $t('endsAt', {
-                    time: getEndsAtTime(playbackManager.nextItem.RunTimeTicks).value
+                    time: getEndsAtTime(playbackManager.nextItem.value.RunTimeTicks)
                   })
                 }}
               </span>
@@ -69,8 +69,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { playbackManager } from '@/store/playback-manager';
-import { getEndsAtTime, getRuntimeTime } from '@/utils/time';
+import { playbackManager } from '#/store/playback-manager';
+import { getEndsAtTime, getRuntimeTime } from '#/utils/time';
 
 const emit = defineEmits<{
   change: [isVisible: boolean];
@@ -79,10 +79,10 @@ const emit = defineEmits<{
 const isHiddenByUser = ref(false);
 
 const currentItemDuration = computed(
-  () => playbackManager.currentItemRuntime / 1000
+  () => playbackManager.currentItemRuntime.value / 1000
 );
 const currentItemTimeLeft = computed(() =>
-  Math.round(currentItemDuration.value - (playbackManager.currentTime || 0))
+  Math.round(currentItemDuration.value - (playbackManager.currentTime.value || 0))
 );
 const nextUpDuration = computed(() => {
   /**
@@ -102,9 +102,9 @@ const nextUpDuration = computed(() => {
 });
 const visible = computed(
   () =>
-    !isHiddenByUser.value &&
-    playbackManager.currentlyPlayingMediaType === 'Video' &&
-    currentItemTimeLeft.value <= nextUpDuration.value
+    !isHiddenByUser.value
+    && playbackManager.isVideo.value
+    && currentItemTimeLeft.value <= nextUpDuration.value
 );
 
 watch(
@@ -115,7 +115,7 @@ watch(
 );
 watch(visible, () => emit('change', visible.value));
 </script>
-<style lang="scss" scoped>
+<style scoped>
 .up-next-dialog {
   position: absolute;
   bottom: 0;

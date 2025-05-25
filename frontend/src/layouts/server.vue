@@ -1,15 +1,11 @@
 <template>
   <LoadingIndicator />
-  <VMain class="h-100">
+  <JMain class="uno-h-full">
     <slot />
-  </VMain>
-  <VFooter
-    app
-    color="transparent">
-    <LocaleSwitcher
-      top
-      elevated />
-  </VFooter>
+  </JMain>
+  <JFooter class="uno-pa-2">
+    <LocaleSwitcher elevated />
+  </JFooter>
 </template>
 
 <script setup lang="ts">

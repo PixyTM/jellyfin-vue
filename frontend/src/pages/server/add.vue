@@ -18,15 +18,15 @@
 
 <route lang="yaml">
 meta:
-  layout: server
+  layout:
+    name: server
 </route>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router/auto';
+import { useTranslation } from 'i18next-vue';
+import { usePageTitle } from '#/composables/page-title';
 
-const { t } = useI18n();
-const route = useRoute();
+const { t } = useTranslation();
 
-route.meta.title = t('addServer');
+usePageTitle(() => t('addServer'));
 </script>

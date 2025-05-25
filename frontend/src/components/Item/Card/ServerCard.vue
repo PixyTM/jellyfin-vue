@@ -14,25 +14,19 @@
           <VBtn
             icon
             disabled>
-            <VIcon>
-              <IMdiInformationOutline />
-            </VIcon>
+            <JIcon class="i-mdi:information-outline" />
           </VBtn>
           <VBtn
             icon
             :disabled="loading || serverInfo.isDefault"
             @click="removeServer">
-            <VIcon>
-              <IMdiDelete />
-            </VIcon>
+            <JIcon class="i-mdi:delete" />
           </VBtn>
           <VBtn
             icon
             :disabled="loading"
             @click="setServer">
-            <VIcon>
-              <IMdiArrowRight />
-            </VIcon>
+            <JIcon class="i-mdi:arrow-right" />
           </VBtn>
         </VCardActions>
       </VCol>
@@ -41,14 +35,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router/auto';
-import { remote } from '@/plugins/remote';
-import type { ServerInfo } from '@/plugins/remote/auth/types';
+import { shallowRef } from 'vue';
+import { useRouter } from 'vue-router';
+import { remote } from '#/plugins/remote';
+import type { ServerInfo } from '#/plugins/remote/auth';
 
-const props = defineProps<{ serverInfo: ServerInfo }>();
+const { serverInfo } = defineProps<{ serverInfo: ServerInfo }>();
 
-const loading = ref(false);
+const loading = shallowRef(false);
 const router = useRouter();
 
 /**
@@ -58,7 +52,7 @@ async function setServer(): Promise<void> {
   loading.value = true;
 
   try {
-    await remote.auth.connectServer(props.serverInfo.PublicAddress);
+    await remote.auth.connectServer(serverInfo.PublicAddress);
     await router.push('/server/login');
   } finally {
     loading.value = false;
@@ -68,6 +62,6 @@ async function setServer(): Promise<void> {
  * Deletes the server from the app
  */
 async function removeServer(): Promise<void> {
-  await remote.auth.deleteServer(props.serverInfo.PublicAddress);
+  await remote.auth.deleteServer(serverInfo.PublicAddress);
 }
 </script>

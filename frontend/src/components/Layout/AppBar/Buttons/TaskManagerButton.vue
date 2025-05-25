@@ -3,13 +3,13 @@
     v-if="showButton"
     :color="buttonColor">
     <template #icon>
-      <VProgressCircular
+      <JProgressCircular
         v-if="!buttonColor"
-        indeterminate
-        size="24" />
-      <VIcon v-else>
-        <IMdiCheck />
-      </VIcon>
+        class="uno-w-full"
+        indeterminate />
+      <JIcon
+        v-else
+        class="i-mdi:check" />
       <VMenu
         v-model="menu"
         :close-on-content-click="false"
@@ -24,16 +24,16 @@
               :key="`${task.id}`"
               :title="task.text">
               <template #append>
-                <VProgressCircular
-                  v-if="task.progress !== 100"
-                  :indeterminate="
-                    task.progress === undefined || task.progress === 0
-                  "
-                  :model-value="task.progress"
-                  size="24" />
-                <VIcon v-else>
-                  <IMdiCheck />
-                </VIcon>
+                <VListItemAction>
+                  <JProgressCircular
+                    v-if="task.progress !== 100"
+                    class="uno-w-15"
+                    :indeterminate="!!task.progress"
+                    :value="task.progress" />
+                  <JIcon
+                    v-else
+                    class="i-mdi:check" />
+                </VListItemAction>
               </template>
             </VListItem>
           </VList>
@@ -48,8 +48,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { taskManager, TaskType } from '@/store/task-manager';
+import { useTranslation } from 'i18next-vue';
+import { VListItemAction } from 'vuetify/components';
+import { taskManager, TaskType } from '#/store/task-manager';
 
 interface TaskInfo {
   progress: undefined | number;
@@ -57,14 +58,12 @@ interface TaskInfo {
   id: string;
 }
 
-defineProps<{ fab?: boolean }>();
-
 const menu = ref(false);
 const completedTaskList = ref<TaskInfo[]>([]);
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const mappedTaskList = computed<TaskInfo[]>(() => {
-  return taskManager.tasks.map((tsk) => {
+  return taskManager.state.value.tasks.map((tsk) => {
     switch (tsk.type) {
       case TaskType.ConfigSync: {
         return {
@@ -77,7 +76,7 @@ const mappedTaskList = computed<TaskInfo[]>(() => {
         return {
           progress: tsk.progress,
           text: t('scanningItemInProgress', {
-            library: tsk.data ?? ''
+            item: tsk.data ?? ''
           }),
           id: tsk.id
         };
@@ -87,7 +86,7 @@ const mappedTaskList = computed<TaskInfo[]>(() => {
 });
 
 const mappedCompleted = computed(() =>
-  mappedTaskList.value.filter((t) => t.progress === 100)
+  mappedTaskList.value.filter(t => t.progress === 100)
 );
 const allCompleted = computed(
   () => mappedCompleted.value.length === mappedTaskList.value.length
@@ -97,18 +96,18 @@ const buttonColor = computed(() =>
 );
 const UITaskList = computed(() => [
   ...(menu.value
-    ? mappedTaskList.value.filter((t) => t.progress !== 100)
+    ? mappedTaskList.value.filter(t => t.progress !== 100)
     : mappedTaskList.value),
   ...completedTaskList.value
 ]);
-const showButton = computed(() => UITaskList.value.length > 0);
+const showButton = computed(() => UITaskList.value.length);
 
 watch([menu, mappedCompleted], () => {
   if (menu.value) {
-    const ids = new Set(completedTaskList.value.map((t) => t.id));
+    const ids = new Set(completedTaskList.value.map(t => t.id));
 
     completedTaskList.value.push(
-      ...mappedCompleted.value.filter((t) => !ids.has(t.id))
+      ...mappedCompleted.value.filter(t => !ids.has(t.id))
     );
   } else {
     completedTaskList.value = [];

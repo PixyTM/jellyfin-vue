@@ -37,7 +37,7 @@
         class="pa-2 flex-fill">
         <VWindowItem value="general">
           <VSelect
-            v-if="contentOptions.length > 0"
+            v-if="contentOptions.length"
             v-model="contentOption"
             :items="contentOptions"
             :label="t('contentType')"
@@ -72,7 +72,9 @@
             :value="dateCreated"
             :label="t('dateAdded')"
             @update:date="
-              (value) => formatAndAssignDate('DateCreated', value)
+              (value) => {
+                metadata!.DateCreated = formatISO(new Date(value))
+              }
             " />
           <VRow>
             <VCol
@@ -97,7 +99,9 @@
             :value="premiereDate"
             :label="t('releaseDate')"
             @update:date="
-              (value) => formatAndAssignDate('PremiereDate', value)
+              (value) => {
+                metadata!.PremiereDate = formatISO(new Date(value))
+              }
             " />
           <VTextField
             v-model="metadata.ProductionYear"
@@ -136,9 +140,7 @@
               @click="onPersonAdd">
               <template #append>
                 <VAvatar>
-                  <VIcon>
-                    <IMdiPlusCircle />
-                  </VIcon>
+                  <JIcon class="i-mdi:plus-circle" />
                 </VAvatar>
               </template>
             </VListItem>
@@ -150,26 +152,25 @@
               @click="onPersonEdit(item)">
               <template #prepend>
                 <VAvatar>
-                  <VImg
+                  <JImg
                     v-if="item.Id && item.PrimaryImageTag"
+                    :alt="$t('person')"
                     :src="
-                      remote.sdk.api?.getItemImageUrl(
+                      getItemImageUrl(
                         item.Id,
                         ImageType.Primary
                       )
-                    " />
-                  <VIcon
-                    v-else
-                    class="bg-grey-darken-3">
-                    <IMdiAccount />
-                  </VIcon>
+                    ">
+                    <template #placeholder>
+                      <JIcon
+                        class="bg-grey-darken-3 i-mdi:account" />
+                    </template>
+                  </JImg>
                 </VAvatar>
               </template>
               <template #append>
                 <VAvatar @click.stop="onPersonDel(i)">
-                  <VIcon>
-                    <IMdiDelete />
-                  </VIcon>
+                  <JIcon class="i-mdi:delete" />
                 </VAvatar>
               </template>
             </VListItem>
@@ -224,32 +225,32 @@ import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
 import { getUserLibraryApi } from '@jellyfin/sdk/lib/utils/api/user-library-api';
 import { AxiosError } from 'axios';
 import { format, formatISO } from 'date-fns';
-import { pick, set } from 'lodash-es';
 import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { useTranslation } from 'i18next-vue';
 import { watchImmediate } from '@vueuse/core';
-import { isArray } from '@/utils/validation';
-import { remote } from '@/plugins/remote';
-import { useSnackbar } from '@/composables/use-snackbar';
-import { useDateFns } from '@/composables/use-datefns';
+import { isArray, isNil } from '@jellyfin-vue/shared/validation';
+import { getItemImageUrl } from '#/utils/images';
+import { remote } from '#/plugins/remote';
+import { useSnackbar } from '#/composables/use-snackbar';
+import { useDateFns } from '#/composables/use-datefns';
+import { pick } from '#/utils/data-manipulation';
 
-type ContentOption = {
+interface ContentOption {
   value: string;
   key: string;
-};
+}
 
-const props = defineProps<{ itemId: string }>();
+const { itemId } = defineProps<{ itemId: string }>();
 
 const emit = defineEmits<{
-  save: [];
+  'save': [];
   'update:forceRefresh': [];
-  cancel: [];
+  'cancel': [];
 }>();
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const metadata = ref<BaseItemDto>();
-const menu = ref(false);
 const person = ref<BaseItemPerson>();
 const genres = ref<string[]>([]);
 const loading = ref(false);
@@ -259,7 +260,7 @@ const contentOption = ref<ContentOption>();
 const contentType = ref<string>();
 const genresModel = computed({
   get() {
-    return metadata.value?.Genres === null ? undefined : metadata.value?.Genres;
+    return metadata.value?.Genres ?? undefined;
   },
   set(newVal) {
     if (isArray(newVal) && metadata.value) {
@@ -269,7 +270,7 @@ const genresModel = computed({
 });
 const tagsModel = computed({
   get() {
-    return metadata.value?.Tags === null ? undefined : metadata.value?.Tags;
+    return metadata.value?.Tags ?? undefined;
   },
   set(newVal) {
     if (isArray(newVal) && metadata.value) {
@@ -298,10 +299,7 @@ const tagLine = computed({
   get: () => metadata.value?.Taglines?.[0] ?? '',
   set: (v) => {
     if (metadata.value) {
-      if (!metadata.value?.Taglines) {
-        metadata.value.Taglines = [];
-      }
-
+      metadata.value.Taglines ??= [];
       metadata.value.Taglines[0] = v;
     }
   }
@@ -311,21 +309,21 @@ const tagLine = computed({
  * Fetch data ancestors for the current item
  */
 async function getData(): Promise<void> {
-  let itemInfo = (
+  const itemInfo = (
     await remote.sdk.newUserApi(getUserLibraryApi).getItem({
-      userId: remote.auth.currentUserId ?? '',
-      itemId: props.itemId
+      userId: remote.auth.currentUserId.value,
+      itemId: itemId
     })
   ).data;
 
   const options = (
     await remote.sdk.newUserApi(getItemUpdateApi).getMetadataEditorInfo({
-      itemId: props.itemId
+      itemId: itemId
     })
   ).data;
 
-  contentOptions.value =
-    options?.ContentTypeOptions?.map((r) => {
+  contentOptions.value
+    = options.ContentTypeOptions?.map((r) => {
       if (r.Name) {
         return {
           // The option name
@@ -334,24 +332,24 @@ async function getData(): Promise<void> {
           value: r.Value ?? ''
         };
       }
-    }).filter((r): r is ContentOption => r !== undefined) ?? [];
-  contentOption.value =
-    contentOptions.value.find((r) => r.value === options.ContentType) ??
-    contentOptions.value[0];
-  contentType.value = options.ContentType ?? contentOption.value?.value;
+    }).filter((r): r is ContentOption => !isNil(r)) ?? [];
+  contentOption.value
+    = contentOptions.value.find(r => r.value === options.ContentType)
+      ?? contentOptions.value[0];
+  contentType.value = options.ContentType ?? contentOption.value.value;
 
   metadata.value = itemInfo;
 
-  if (!metadata.value?.Id) {
+  if (!metadata.value.Id) {
     return;
   }
 
   const ancestors = await remote.sdk.newUserApi(getLibraryApi).getAncestors({
-    userId: remote.auth.currentUserId ?? '',
+    userId: remote.auth.currentUserId.value,
     itemId: metadata.value.Id
   });
   const libraryInfo = ancestors.data.find(
-    (index) => index.Type === 'CollectionFolder'
+    index => index.Type === 'CollectionFolder'
   );
 
   if (!libraryInfo?.Id) {
@@ -365,12 +363,12 @@ async function getData(): Promise<void> {
  * Get genres associated with the current item
  */
 async function getGenres(parentId: string): Promise<void> {
-  genres.value =
-    (
+  genres.value
+    = (
       await remote.sdk.newUserApi(getGenresApi).getGenres({
         parentId
       })
-    ).data.Items?.map((index) => index.Name).filter(
+    ).data.Items?.map(index => index.Name).filter(
       (genre): genre is string => !!genre
     ) ?? [];
 }
@@ -451,7 +449,7 @@ async function saveMetadata(): Promise<void> {
     }
 
     await remote.sdk.newUserApi(getItemUpdateApi).updateItem({
-      itemId: metadata.value?.Id,
+      itemId: metadata.value.Id,
       baseItemDto: item
     });
     await saveContentType();
@@ -473,18 +471,6 @@ async function saveMetadata(): Promise<void> {
   } finally {
     loading.value = false;
   }
-}
-
-/**
- * Formats and updates dates
- */
-function formatAndAssignDate(key: keyof BaseItemDto, date: string): void {
-  if (!metadata.value) {
-    return;
-  }
-
-  menu.value = false;
-  set(metadata.value, key, formatISO(new Date(date)));
 }
 
 /**
@@ -510,7 +496,7 @@ function onPersonSave(item: BaseItemPerson): void {
   }
 
   if (item.Id) {
-    metadata.value.People = metadata.value.People.map((p) =>
+    metadata.value.People = metadata.value.People.map(p =>
       p.Id === item.Id ? item : p
     );
   } else {
@@ -532,5 +518,5 @@ function onPersonDel(index: number): void {
   metadata.value.People.splice(index, 1);
 }
 
-watchImmediate(() => props.itemId, getData);
+watchImmediate(() => itemId, getData);
 </script>

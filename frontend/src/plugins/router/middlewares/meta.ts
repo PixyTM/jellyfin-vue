@@ -1,21 +1,18 @@
-import defu from 'defu';
-import { ref } from 'vue';
+import { defu } from 'defu';
+import { ref, toRaw } from 'vue';
 import type {
+  NavigationGuardReturn,
   RouteLocationNormalized,
-  RouteLocationRaw,
   RouteMeta
-} from 'vue-router/auto';
+} from 'vue-router';
 
-const defaultMeta: RouteMeta = {
-  layout: 'default',
-  transparentLayout: false,
-  admin: false,
-  backdrop: {
-    opacity: 0.25
+const defaultMeta = (): RouteMeta => ({
+  layout: {
+    transition: {}
   }
-};
+});
 
-const reactiveMeta = ref(structuredClone(defaultMeta));
+const reactiveMeta = ref(defaultMeta());
 
 /**
  * This middleware handles the meta property between routes
@@ -25,7 +22,8 @@ const reactiveMeta = ref(structuredClone(defaultMeta));
  *
  * <route lang="yaml">
  *  meta:
- *    layout: server
+ *    layout:
+ *      name: server
  * </route>
  *
  * That block is also needed when a property needs to be resolved before
@@ -42,17 +40,15 @@ const reactiveMeta = ref(structuredClone(defaultMeta));
 export function metaGuard(
   to: RouteLocationNormalized,
   from: RouteLocationNormalized
-): boolean | RouteLocationRaw {
-  reactiveMeta.value = defu(to.meta, defaultMeta);
+): NavigationGuardReturn {
+  reactiveMeta.value = defu(to.meta, defaultMeta());
+  /**
+   * This is needed to ensure all the meta matches the expected data
+   */
+  from.meta = defu(toRaw(from.meta), defaultMeta());
   to.meta = reactiveMeta.value;
 
-  if (from.meta.transition?.leave) {
-    if (to.meta.transition) {
-      to.meta.transition.enter = from.meta.transition.leave;
-    } else {
-      to.meta.transition = { enter: from.meta.transition.leave };
-    }
+  if (from.meta.layout.transition.leave) {
+    to.meta.layout.transition.enter = from.meta.layout.transition.leave;
   }
-
-  return true;
 }

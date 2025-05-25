@@ -8,12 +8,10 @@
         {{ genre.Name }}
       </span>
       <VSpacer />
-      <VFadeTransition>
-        <PlayButton
-          :item="genre" />
-      </VFadeTransition>
+      <PlayButton
+        :item="genre" />
       <VBtn
-        class="play-button mr-2"
+        class="mr-2 play-button"
         min-width="8em"
         variant="outlined"
         :to="`./${genre.Id}/shuffle`">
@@ -22,7 +20,7 @@
     </VAppBar>
     <VContainer class="after-second-toolbar">
       <ItemGrid
-        v-if="genres.length > 0"
+        v-if="genres.length"
         :items="genres" />
       <VRow
         justify="center">
@@ -34,10 +32,11 @@
           <SkeletonCard
             v-for="n in 24"
             :key="n"
-            boilerplate
-            text />
+
+            text
+            boilerplate />
         </VCol>
-        <div class="empty-message text-center">
+        <div class="text-center empty-message">
           <h1 class="text-h5">
             {{ $t('libraryEmpty') }}
           </h1>
@@ -55,39 +54,41 @@ import {
 import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
 import { getUserLibraryApi } from '@jellyfin/sdk/lib/utils/api/user-library-api';
 import { computed } from 'vue';
-import { useRoute } from 'vue-router/auto';
-import { isStr } from '@/utils/validation';
-import { useResponsiveClasses } from '@/composables/use-responsive-classes';
-import { useBaseItem } from '@/composables/apis';
+import { useRoute } from 'vue-router';
+import { isStr } from '@jellyfin-vue/shared/validation';
+import { useResponsiveClasses } from '#/composables/use-responsive-classes';
+import { useBaseItem } from '#/composables/apis';
+import { useItemPageTitle } from '#/composables/page-title';
 
 const route = useRoute('/genre/[itemId]');
 
 const { itemId } = route.params;
 
 const includeItemTypes = computed<BaseItemKind[]>(() => {
-  const typesQuery = route.query.type as BaseItemKind ?? [];
+  const typesQuery = (route.query.type ?? []) as BaseItemKind[];
 
   return isStr(typesQuery)
-    ? [typesQuery]
+    ? [typesQuery] as BaseItemKind[]
     : typesQuery;
 });
 
-const { data: genre } = await useBaseItem(getUserLibraryApi, 'getItem')(() => ({
-  itemId
-}));
+const [{ data: genre }, { data: genres }] = await Promise.all([
+  useBaseItem(getUserLibraryApi, 'getItem')(() => ({
+    itemId
+  })),
+  useBaseItem(getItemsApi, 'getItems')(() => ({
+    genreIds: [itemId],
+    includeItemTypes: includeItemTypes.value,
+    recursive: true,
+    sortBy: ['SortName'],
+    sortOrder: [SortOrder.Ascending]
+  }))
+]);
 
-const { data: genres } = await useBaseItem(getItemsApi, 'getItems')(() => ({
-  genreIds: [itemId],
-  includeItemTypes: includeItemTypes.value,
-  recursive: true,
-  sortBy: ['SortName'],
-  sortOrder: [SortOrder.Ascending]
-}));
-
-route.meta.title = genre.value.Name;
+useItemPageTitle(genre);
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .second-toolbar {
   top: 56px;
 }

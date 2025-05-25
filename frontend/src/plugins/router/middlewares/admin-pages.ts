@@ -1,7 +1,7 @@
-import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router/auto';
-import { useSnackbar } from '@/composables/use-snackbar';
-import { i18n } from '@/plugins/i18n';
-import { remote } from '@/plugins/remote';
+import type { NavigationGuardReturn, RouteLocationNormalized } from 'vue-router';
+import i18next from 'i18next';
+import { useSnackbar } from '#/composables/use-snackbar';
+import { remote } from '#/plugins/remote';
 
 /**
  * Redirect the user to index page when attempting to access
@@ -9,12 +9,10 @@ import { remote } from '@/plugins/remote';
  */
 export function adminGuard(
   to: RouteLocationNormalized
-): boolean | RouteLocationRaw {
-  if (to.meta.admin && !remote.auth.currentUser?.Policy?.IsAdministrator) {
-    useSnackbar(i18n.t('unauthorized'), 'error');
+): NavigationGuardReturn {
+  if (to.meta.admin && !remote.auth.currentUser.value?.Policy?.IsAdministrator) {
+    useSnackbar(i18next.t('unauthorized'), 'error');
 
-    return { path: '/', replace: true };
+    return false;
   }
-
-  return true;
 }

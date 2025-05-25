@@ -1,5 +1,8 @@
 <template>
-  <SettingsPage page-title="newUser">
+  <SettingsPage>
+    <template #title>
+      {{ t('users') }}
+    </template>
     <template #actions>
       <VBtn
         color="primary"
@@ -60,11 +63,11 @@ meta:
 <script setup lang="ts">
 import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api';
 import { formatDistanceToNow } from 'date-fns';
-import { useI18n } from 'vue-i18n';
-import { useDateFns } from '@/composables/use-datefns';
-import { useApi } from '@/composables/apis';
+import { useTranslation } from 'i18next-vue';
+import { useDateFns } from '#/composables/use-datefns';
+import { useApi } from '#/composables/apis';
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const { data: users } = await useApi(getUserApi, 'getUsers')(() => ({}));
 </script>

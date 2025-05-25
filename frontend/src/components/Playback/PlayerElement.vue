@@ -1,27 +1,35 @@
 <template>
   <template v-if="mediaElementType">
     <Teleport
-      :to="teleportTarget"
-      :disabled="!teleportTarget">
-      <Component
-        :is="mediaElementType"
-        v-show="mediaElementType === 'video' && teleportTarget"
-        ref="mediaElementRef"
-        :poster="String(posterUrl)"
-        autoplay
-        crossorigin
-        playsinline
-        :loop="playbackManager.isRepeatingOnce"
-        :class="{ stretched: playerElement.isStretched.value }"
-        @loadeddata="onLoadedData">
-        <track
-          v-for="sub in playbackManager.currentItemVttParsedSubtitleTracks"
-          :key="`${playbackManager.currentSourceUrl}-${sub.srcIndex}`"
-          kind="subtitles"
-          :label="sub.label"
-          :srclang="sub.srcLang"
-          :src="sub.src" />
-      </Component>
+      :to="videoContainerRef"
+      :disabled="!videoContainerRef"
+      defer>
+      <div class="uno-relative">
+        <Component
+          :is="mediaElementType"
+          v-show="playbackManager.isVideo.value && videoContainerRef"
+          ref="mediaElementRef"
+          :poster="String(posterUrl)"
+          autoplay
+          crossorigin
+          playsinline
+          :loop="playbackManager.isRepeatingOnce.value"
+          :class="{
+            'uno-object-fill uno-w-screen': playerElement.state.value.isStretched,
+            'uno-h-full uno-max-h-100vh': playbackManager.isVideo.value
+          }"
+          @loadeddata="onLoadedData">
+          <track
+            v-for="sub in playerElement.currentItemVttParsedSubtitleTracks.value"
+            :key="`${playbackManager.currentSourceUrl.value}-${sub.srcIndex}`"
+            kind="subtitles"
+            :label="sub.label"
+            :srclang="sub.srcLang"
+            :src="sub.src">
+        </Component>
+        <SubtitleTrack
+          v-if="subtitleSettings.state.value.enabled && playerElement.currentExternalSubtitleTrack.value?.parsed" />
+      </div>
     </Teleport>
   </template>
 </template>
@@ -29,26 +37,45 @@
 <script setup lang="ts">
 import Hls, { ErrorTypes, Events, type ErrorData } from 'hls.js';
 import HlsWorkerUrl from 'hls.js/dist/hls.worker.js?url';
-import { computed, nextTick, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useSnackbar } from '@/composables/use-snackbar';
+import { computed, nextTick, onScopeDispose, watch } from 'vue';
+import { useTranslation } from 'i18next-vue';
+import { isNil } from '@jellyfin-vue/shared/validation';
+import { PromiseQueue } from '@jellyfin-vue/shared/promises';
+import { useSnackbar } from '#/composables/use-snackbar';
 import {
   mediaElementRef,
   mediaWebAudio
-} from '@/store';
-import { playbackManager } from '@/store/playback-manager';
-import { playerElement } from '@/store/player-element';
-import { getImageInfo } from '@/utils/images';
-import { isNil } from '@/utils/validation';
+} from '#/store';
+import { playbackManager } from '#/store/playback-manager';
+import { playerElement, videoContainerRef } from '#/store/player-element';
+import { getImageInfo } from '#/utils/images';
+import { subtitleSettings } from '#/store/settings/subtitle';
 
-const { t } = useI18n();
-
+const { t } = useTranslation();
+const webAudioQueue = new PromiseQueue();
 const hls = Hls.isSupported()
   ? new Hls({
     testBandwidth: false,
     workerPath: HlsWorkerUrl
   })
   : undefined;
+
+const mediaElementType = computed<'audio' | 'video' | undefined>(() => {
+  if (playbackManager.isAudio.value) {
+    return 'audio';
+  } else if (playbackManager.isVideo.value) {
+    return 'video';
+  }
+});
+
+const posterUrl = computed(() =>
+  !isNil(playbackManager.currentItem.value)
+  && playbackManager.isVideo.value
+    ? getImageInfo(playbackManager.currentItem.value, {
+      preferBackdrop: true
+    }).url
+    : undefined
+);
 
 /**
  * Detaches HLS instance after playback is done
@@ -64,57 +91,41 @@ function detachHls(): void {
  * Suspends WebAudio when no playback is in place
  */
 async function detachWebAudio(): Promise<void> {
-  if (mediaWebAudio.sourceNode) {
-    mediaWebAudio.sourceNode.disconnect();
-    mediaWebAudio.sourceNode = undefined;
-  }
+  const { context, sourceNode } = mediaWebAudio;
 
-  await mediaWebAudio.context.suspend();
+  if (context.value) {
+    if (sourceNode.value) {
+      sourceNode.value.disconnect();
+      sourceNode.value = undefined;
+    }
+
+    await context.value.close();
+    context.value = undefined;
+  }
 }
 
-const mediaElementType = computed<'audio' | 'video' | undefined>(() => {
-  if (playbackManager.currentlyPlayingMediaType === 'Audio') {
-    return 'audio';
-  } else if (playbackManager.currentlyPlayingMediaType === 'Video') {
-    return 'video';
-  }
-});
-
 /**
- * If the player is a video element and we're in the PiP player or fullscreen video playback,
- * we need to ensure the DOM elements are mounted before the teleport target is ready
+ * Resumes WebAudio when playback is in place
  */
-const teleportTarget = computed<
-'.fullscreen-video-container' | '.minimized-video-container' | undefined
->(() => {
-  if (playbackManager.currentlyPlayingMediaType === 'Video') {
-    if (playerElement.isFullscreenMounted.value) {
-      return '.fullscreen-video-container';
-    } else if (playerElement.isPiPMounted.value) {
-      return '.minimized-video-container';
-    }
-  }
-});
+async function attachWebAudio(el: HTMLMediaElement): Promise<void> {
+  const { context, sourceNode } = mediaWebAudio;
 
-const posterUrl = computed(() =>
-  !isNil(playbackManager.currentItem) &&
-  playbackManager.currentlyPlayingMediaType === 'Video'
-    ? getImageInfo(playbackManager.currentItem, {
-      preferBackdrop: true
-    }).url
-    : undefined
-);
+  context.value = new AudioContext();
+  sourceNode.value = context.value.createMediaElementSource(el);
+  await context.value.resume();
+  sourceNode.value.connect(context.value.destination);
+}
 
 /**
  * Called by the media element when the playback is ready
  */
 async function onLoadedData(): Promise<void> {
-  if (playbackManager.currentlyPlayingMediaType === 'Video') {
+  if (playbackManager.isVideo.value) {
     if (mediaElementRef.value) {
       /**
        * Makes the resume start from the correct time
        */
-      mediaElementRef.value.currentTime = playbackManager.currentTime;
+      mediaElementRef.value.currentTime = playbackManager.currentTime.value;
     }
 
     await playerElement.applyCurrentSubtitle();
@@ -152,50 +163,38 @@ function onHlsEror(_event: typeof Hls.Events.ERROR, data: ErrorData): void {
   }
 }
 
-watch(
-  () => [
-    playbackManager.currentSubtitleStreamIndex,
-    playerElement.isFullscreenMounted,
-    playerElement.isPiPMounted
-  ],
-  async (newVal) => {
-    if (newVal[1] || newVal[2]) {
-      await playerElement.applyCurrentSubtitle();
-    }
-  }
-);
-
-watch(mediaElementRef, async () => {
-  await nextTick();
+watch(mediaElementRef, () => {
   detachHls();
-  await detachWebAudio();
+  void webAudioQueue.add(() => detachWebAudio());
 
   if (mediaElementRef.value) {
-    if (mediaElementType.value === 'video' && hls) {
+    if (playbackManager.isVideo.value && hls) {
       hls.attachMedia(mediaElementRef.value);
       hls.on(Events.ERROR, onHlsEror);
     }
 
-    await mediaWebAudio.context.resume();
-    mediaWebAudio.sourceNode = mediaWebAudio.context.createMediaElementSource(
-      mediaElementRef.value
-    );
-    mediaWebAudio.sourceNode.connect(mediaWebAudio.context.destination);
+    if (playbackManager.isAudio.value) {
+      void webAudioQueue.add(() => attachWebAudio(mediaElementRef.value!));
+    }
   }
 });
 
-watch(
-  () => playbackManager.currentSourceUrl,
-  (newUrl) => {
+watch(playbackManager.currentSourceUrl,
+  async (newUrl) => {
     if (hls) {
       hls.stopLoad();
     }
 
+    /**
+     * Ensure element is mounted before setting the source.
+     */
+    await nextTick();
+
     if (
-      mediaElementRef.value &&
-      (!newUrl ||
-      playbackManager.currentMediaSource?.SupportsDirectPlay ||
-      !hls)
+      mediaElementRef.value
+      && (!newUrl
+        || playbackManager.currentMediaSource.value?.SupportsDirectPlay
+        || !hls)
     ) {
       /**
        * For the video case, Safari iOS doesn't support hls.js but supports native HLS.
@@ -205,9 +204,9 @@ watch(
        */
       mediaElementRef.value.src = String(newUrl);
     } else if (
-      hls &&
-      playbackManager.currentlyPlayingMediaType === 'Video' &&
-      newUrl
+      hls
+      && playbackManager.isVideo.value
+      && newUrl
     ) {
       /**
        * We need to check if HLS.js can handle transcoded audio to remove the video check
@@ -216,10 +215,10 @@ watch(
     }
   }
 );
-</script>
 
-<style scoped>
-.stretched {
-  object-fit: fill;
-}
-</style>
+onScopeDispose(() => {
+  detachHls();
+  hls?.destroy();
+  void detachWebAudio();
+});
+</script>

@@ -3,10 +3,8 @@
     class="ma-2"
     :icon="$vuetify.display.smAndDown">
     {{ !$vuetify.display.smAndDown ? t('filter') : undefined }}
-    <VIcon :end="!$vuetify.display.smAndDown">
-      <IMdiMenuDown v-if="!$vuetify.display.smAndDown" />
-      <IMdiFilterVariant v-else />
-    </VIcon>
+    <JIcon
+      :class="$vuetify.display.smAndDown ? 'mdi-filter-variant' : 'i-mdi:menu-down'" />
     <VMenu
       :disabled="disabled"
       :close-on-content-click="false"
@@ -63,7 +61,7 @@
           </VExpansionPanelText>
         </VExpansionPanel>
         <VExpansionPanel
-          v-if="genreFilters.length > 0"
+          v-if="genreFilters.length"
           :title="t('genres')">
           <VExpansionPanelText>
             <VList
@@ -88,7 +86,7 @@
           </VExpansionPanelText>
         </VExpansionPanel>
         <VExpansionPanel
-          v-if="ratingFilters.length > 0"
+          v-if="ratingFilters.length"
           :title="t('parentalRatings')">
           <VExpansionPanelText>
             <VList
@@ -138,7 +136,7 @@
           </VExpansionPanelText>
         </VExpansionPanel>
         <VExpansionPanel
-          v-if="yearFilters.length > 0"
+          v-if="yearFilters.length"
           :title="t('years')">
           <VExpansionPanelText>
             <VList
@@ -171,9 +169,9 @@
 import { type BaseItemDto, ItemFilter } from '@jellyfin/sdk/lib/generated-client';
 import { getFilterApi } from '@jellyfin/sdk/lib/utils/api/filter-api';
 import { computed, ref, watch } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { remote } from '@/plugins/remote';
-import { useSnackbar } from '@/composables/use-snackbar';
+import { useTranslation } from 'i18next-vue';
+import { remote } from '#/plugins/remote';
+import { useSnackbar } from '#/composables/use-snackbar';
 
 export type FeatureFilters =
   | 'HasSubtitles'
@@ -193,7 +191,7 @@ export interface Filters {
   years: number[];
 }
 
-const props = defineProps<{
+const { item, disabled } = defineProps<{
   item: BaseItemDto;
   disabled?: boolean;
 }>();
@@ -202,7 +200,7 @@ const emit = defineEmits<{
   change: [filters: Filters];
 }>();
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const selectedFeatureFilters = ref<FeatureFilters[]>([]);
 const selectedGenreFilters = ref<string[]>([]);
@@ -216,8 +214,8 @@ const yearFilters = ref<number[]>([]);
 
 const isMovieOrTvShow = computed(
   () =>
-    props.item.CollectionType === 'movies' ||
-    props.item.CollectionType === 'tvshows'
+    item.CollectionType === 'movies'
+    || item.CollectionType === 'tvshows'
 );
 
 const statusFilters = computed<{ label: string; name: ItemFilter }[]>(() => [
@@ -279,16 +277,16 @@ const typeFilters: { label: string; name: TypeFilters }[] = [
  * applying filters and sorting
  */
 async function refreshItems(): Promise<void> {
-  if (!props.item.Id || !props.item.Type) {
+  if (!item.Id || !item.Type) {
     return;
   }
 
   try {
     const response = (
       await remote.sdk.newUserApi(getFilterApi).getQueryFiltersLegacy({
-        userId: remote.auth.currentUserId,
-        parentId: props.item.Id,
-        includeItemTypes: [props.item.Type]
+        userId: remote.auth.currentUserId.value,
+        parentId: item.Id,
+        includeItemTypes: [item.Type]
       })
     ).data;
 
@@ -320,10 +318,10 @@ function emitFilterChange(): void {
     years: selectedYearFilters.value
   });
 }
-watch(() => props.item, refreshItems);
+watch(() => item, refreshItems);
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .filter-content {
   max-height: 15rem;
 }

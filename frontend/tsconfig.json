@@ -1,46 +1,29 @@
 {
+  "extends": "@jellyfin-vue/configs/typescript",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "Bundler",
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "sourceMap": true,
-    "strict": true,
-    "noEmit": true,
-    "isolatedModules": true,
-    "useDefineForClassFields": true,
-    "noImplicitThis": true,
-    "noImplicitAny": true,
-    "experimentalDecorators": true,
-    "removeComments": true,
-    "verbatimModuleSyntax": true,
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
     "types": [
       "axios",
-      "@intlify/unplugin-vue-i18n/messages",
-      "unplugin-icons/types/vue",
+      "@jellyfin-vue/i18n",
       "unplugin-vue-router/client",
       "vite/client",
       "vuetify",
       "vue"
     ]
   },
-  "vueCompilerOptions": {
-    "strictTemplates": true,
-    "htmlAttributes": ["aria-*", "data-*"]
-  },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
-    "src/**/*.vue",
-    "**/**/*.json",
-    "types/**/*.d.ts",
-    ".eslintrc.cjs",
-    "vite.config.ts"
+  "exclude": [
+    "dist",
+    "node_modules",
+    "coverage"
   ],
-  "exclude": ["node_modules"]
+  "include": [
+    "**/*.ts",
+    "**/*.vue",
+    "**/*d.ts",
+    "**/*.json"
+  ]
 }

@@ -7,12 +7,13 @@
         ? undefined
         : innerModel.length === 0
           ? items[0].title
-          : items.find((i) => i.value == innerModel[0])?.title
+          : items.find((i) => i.value === innerModel[0])?.title
     }}
-    <VIcon :end="!$vuetify.display.smAndDown">
-      <IMdiMenuDown v-if="!$vuetify.display.smAndDown" />
-      <IMdiEye v-else />
-    </VIcon>
+    <JIcon
+      :class="{
+        'i-mdi:menu-down': !$vuetify.display.smAndDown,
+        'i-mdi:eye': $vuetify.display.smAndDown
+      }" />
     <VMenu>
       <VList
         :items="items"
@@ -24,19 +25,19 @@
 <script setup lang="ts">
 import type { BaseItemDto, BaseItemKind } from '@jellyfin/sdk/lib/generated-client';
 import { computed, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { useTranslation } from 'i18next-vue';
 
-const props = defineProps<{
+const { type } = defineProps<{
   type: BaseItemDto['CollectionType'];
 }>();
 
 const innerModel = ref<BaseItemKind[]>([]);
 const model = defineModel<BaseItemKind | undefined>({ required: true });
 
-const { t } = useI18n();
+const { t } = useTranslation();
 
 const items = computed<{ title: string; value: BaseItemKind }[]>(() => {
-  switch (props.type) {
+  switch (type) {
     case 'movies': {
       return [
         { title: t('movies'), value: 'Movie' },

@@ -1,26 +1,28 @@
 /**
- * Load splashcreen color scheme based on stored settings or user-agent preferences
+ * This modules handles the splashscreen color scheme based on user-agent preferences or stored settings
+ * before Vue is loaded.
+ *
+ * When Vue is loaded, it gets replaced by the main application and the JSplashscreen (used in App.vue)
+ * is displayed instead.
  */
 import { destr } from 'destr';
-import type { ClientSettingsState } from '@/store/client-settings';
+import type { PartialDeep } from 'type-fest';
+import { darkColors, lightColors } from '@jellyfin-vue/shared/colors';
+import type { ThemeSettingsState } from '#/store/settings/theme';
+import '#/assets/styles/splashscreen.css';
 
-const store = localStorage.getItem('clientSettings') ?? '{}';
-const parsedStore = destr<ClientSettingsState>(store);
-const matchedDarkColorScheme = window.matchMedia(
+const store = localStorage.getItem('themeSettings') ?? '{}';
+const parsedStore = destr<PartialDeep<ThemeSettingsState>>(store);
+const matchedDarkColorScheme = globalThis.matchMedia(
   '(prefers-color-scheme: dark)'
 ).matches;
-let classToApply: 'light' | 'dark' = matchedDarkColorScheme ? 'dark' : 'light';
+const isDark = parsedStore.darkMode ?? matchedDarkColorScheme;
+const storeColors = parsedStore.colors?.[isDark ? 'dark' : 'light'];
 
-if ('darkMode' in parsedStore) {
-  const storeDarkMode = parsedStore.darkMode;
+/**
+ * Fallback when the store is not initialized yet (first start)
+ */
+const defaults = matchedDarkColorScheme ? darkColors() : lightColors();
+const colorToApply = (storeColors ?? defaults).background!;
 
-  if (typeof storeDarkMode === 'boolean') {
-    classToApply = parsedStore.darkMode === true ? 'dark' : 'light';
-  }
-}
-
-const element = document.querySelector('.splashBackground');
-
-if (element) {
-  element.classList.add(classToApply);
-}
+document.body.style.setProperty('--j-theme-color-background', colorToApply);

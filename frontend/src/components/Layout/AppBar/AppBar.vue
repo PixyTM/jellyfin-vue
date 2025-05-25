@@ -10,21 +10,17 @@
       @click="navigationDrawer = !navigationDrawer" />
     <AppBarButtonLayout @click="$router.back()">
       <template #icon>
-        <VIcon>
-          <IMdiArrowLeft />
-        </VIcon>
+        <JIcon class="i-mdi:arrow-left" />
       </template>
     </AppBarButtonLayout>
     <VSpacer />
     <SearchField />
     <VSpacer />
     <AppBarButtonLayout
-      v-if="!remote.socket.isConnected.value || !isConnectedToServer"
-      :color="!remote.socket.isConnected.value ? 'yellow' : 'red'">
+      v-if="!(remote.socket.isConnected.value || isConnectedToServer)"
+      :color="isConnectedToServer ? 'yellow' : 'red'">
       <template #icon>
-        <VIcon>
-          <IMdiNetworkOffOutline />
-        </VIcon>
+        <JIcon class="i-mdi:network-off-outline" />
       </template>
       <template #tooltip>
         <span>{{ !remote.socket.isConnected.value ? $t('noWebSocketConnection') : $t('noServerConnection') }}</span>
@@ -33,21 +29,22 @@
     <TaskManagerButton />
     <AppBarButtonLayout @click="switchColorTheme">
       <template #icon>
-        <VIcon>
-          <IMdiBrightnessAuto v-if="clientSettings.darkMode === 'auto'" />
-          <IMdiWeatherSunny v-else-if="clientSettings.darkMode" />
-          <IMdiWeatherNight v-else />
-        </VIcon>
+        <JIcon
+          :class="{
+            'i-mdi:weather-sunny': themeSettings.isAutoTheme.value,
+            'i-mdi:weather-night': !themeSettings.currentThemeIsDark.value,
+            'i-mdi:brightness-auto': themeSettings.currentThemeIsDark.value
+          }" />
       </template>
       <template #tooltip>
-        <span v-if="clientSettings.darkMode === 'auto'">
-          {{ $t('switchToDarkMode') }}
-        </span>
-        <span v-else-if="clientSettings.darkMode">
+        <span v-if="themeSettings.isAutoTheme.value">
           {{ $t('switchToLightMode') }}
         </span>
-        <span v-else>
+        <span v-else-if="themeSettings.currentThemeIsDark.value">
           {{ $t('followSystemTheme') }}
+        </span>
+        <span v-else>
+          {{ $t('switchToDarkMode') }}
         </span>
       </template>
     </AppBarButtonLayout>
@@ -60,34 +57,37 @@
 
 <script setup lang="ts">
 import { computed, inject, type Ref } from 'vue';
-import { useRoute } from 'vue-router/auto';
-import { windowScroll, isConnectedToServer } from '@/store';
-import { clientSettings } from '@/store/client-settings';
-import { remote } from '@/plugins/remote';
+import { windowScroll, isConnectedToServer, transparencyEffects } from '#/store';
+import { themeSettings } from '#/store/settings/theme';
+import { remote } from '#/plugins/remote';
+import { JView_isRouting } from '#/store/keys';
 
-const route = useRoute();
 const { y } = windowScroll;
-const transparentAppBar = computed<boolean>(() => {
-  return (route.meta.transparentLayout || false) && y.value < 10;
-});
+const isRouting = inject(JView_isRouting);
+const transparentAppBar = computed(previous => isRouting?.value ? previous : transparencyEffects.value && y.value < 10);
 
 /**
  * Cycle between the different color schemas
  */
 function switchColorTheme(): void {
-  if (clientSettings.darkMode === 'auto') {
-    clientSettings.darkMode = true;
-  } else if (clientSettings.darkMode) {
-    clientSettings.darkMode = false;
+  /**
+   * 1. If auto, we go to light
+   * 2. If dark, we go to auto
+   * 3. If light, we go to dark
+   */
+  if (themeSettings.isAutoTheme.value) {
+    themeSettings.currentTheme.value = false;
+  } else if (themeSettings.currentThemeIsDark.value) {
+    themeSettings.currentTheme.value = undefined;
   } else {
-    clientSettings.darkMode = 'auto';
+    themeSettings.currentTheme.value = true;
   }
 }
 
 const navigationDrawer = inject<Ref<boolean>>('NavigationDrawer');
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .app-bar-safe-zone {
   height: calc(48px + env(safe-area-inset-top)) !important;
 }
